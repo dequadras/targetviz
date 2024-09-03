@@ -1,6 +1,7 @@
 """Configuration for the package is handled in this wrapper for confuse.
 https://github.com/pandas-profiling/pandas-profiling/blob/a55ab613865cbd0a11f2056ca6f6ca1c43c0a2f1/pandas_profiling/config.py
 """
+
 import argparse
 from pathlib import Path
 
@@ -44,7 +45,7 @@ class Config(object):
         """Helper function to set config_ variables based on kwargs."""
         for key, value in values.items():
             if key in reference:
-                if type(value) == dict:
+                if isinstance(value, dict):
                     self._set_kwargs(reference[key], value)
                 else:
                     reference[key].set(value)
