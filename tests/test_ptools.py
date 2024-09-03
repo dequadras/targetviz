@@ -1,6 +1,7 @@
 """
 Implement test for targetviz report
 """
+
 from time import sleep
 from unittest.mock import MagicMock, Mock
 
@@ -261,3 +262,40 @@ def test_numeric_name():
     sleep(1)  # make sure folder names change since last test
     df_names_num = pd.DataFrame({"pred": [0, 1, 2, 3], "0": [2, 3, 4, 5], 0: [7, 8, 9, 0]})
     targetviz_report(df_names_num, "pred", n_breaks=2)
+
+
+def test_nullable_types():
+    # Test with Int (nullable int)
+    df_int = pd.DataFrame(
+        {"target": [1, 2, 3, 4, pd.NA], "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64")}
+    )
+    assert targetviz_report(df_int, "target") is None
+
+    # Test with Float (nullable float)
+    df_float = pd.DataFrame(
+        {
+            "target": [1.0, 2.0, 3.0, 4.0, pd.NA],
+            "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
+        }
+    )
+    assert targetviz_report(df_float, "target") is None
+
+    # Test with Bool (nullable boolean)
+    df_bool = pd.DataFrame(
+        {
+            "target": [True, False, True, False, pd.NA],
+            "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
+        }
+    )
+    assert targetviz_report(df_bool, "target") is None
+
+    # Test with mixed types
+    df_mixed = pd.DataFrame(
+        {
+            "target": [1, 2, 3, 4, 5],
+            "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64"),
+            "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
+            "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
+        }
+    )
+    assert targetviz_report(df_mixed, "target") is None

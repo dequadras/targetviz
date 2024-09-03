@@ -25,6 +25,7 @@ jobs:
         pip install -r requirements.txt
         pip install pre-commit
     - name: Run pre-commit hooks
+      if: matrix.python-version == '3.11'
       run: pre-commit run --all-files
     - name: Run tests
       run: python -m unittest discover tests

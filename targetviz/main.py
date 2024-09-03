@@ -252,7 +252,7 @@ class BaseAnalyzer:
                 self.type = "DATE"
             elif type_ in ["category", "object"]:
                 self.type = "CAT"
-            elif type_.startswith(("float", "int", "Int")):
+            elif type_.startswith(("float", "int", "Int", "Float")):
                 self.type = "NUM"
             else:
                 raise TypeError(f"cannot parse type {type_}")
