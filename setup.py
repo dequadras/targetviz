@@ -28,4 +28,8 @@ def get_dependencies():
 setup(
     version=get_version(),
     install_requires=get_dependencies(),
+    include_package_data=True,
+    package_data={
+        "targetviz": ["templates/*"],
+    },
 )
