@@ -8,13 +8,13 @@ dynamic = ["version"]
 description = "Package for generating automatic reports of variable analyses"
 readme = "README.md"
 authors = [{name = "Luis de Quadras"}]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Visualization",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
 ]
 dependencies = []  # We'll read these dynamically from requirements.txt
 
