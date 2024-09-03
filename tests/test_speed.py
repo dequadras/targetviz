@@ -1,9 +1,10 @@
 """
 Test speed for big datasets
 """
+import unittest
+
 import numpy as np
 import pandas as pd
-import pytest
 
 from targetviz.main import targetviz_report
 
@@ -58,7 +59,7 @@ def report_big_df_cat():
     targetviz_report(big_cat_df, "target")
 
 
-@pytest.mark.skip(reason="Test is slow and should only be used manually")
+@unittest.skip("Test is slow and should only be used manually")
 def test_speed():
     """
     Main module functionality. Perform report for big dataframes
