@@ -23,6 +23,30 @@
             margin-left: auto;
             margin-right: auto;
         }
+        .flex-container {
+            display: flex;
+            justify-content: space-between;
+        }
+        .histogram {
+            width: 48%;
+        }
+        .table-container {
+            width: 48%;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em; /* Slightly reduce font size */
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 4px; /* Reduce padding */
+            text-align: left;
+            line-height: 1.2; /* Reduce line height */
+        }
+        th {
+            background-color: #f2f2f2;
+        }
     </style>
 </head>
 <body>
@@ -31,10 +55,17 @@
     <div>
         {% block content %}
         <h2>TARGET</h2>
-        <div>
-            {% block target %}
-            <img class="img-responsive center-img" src="{{ result_dict.desc_and_hist_target }}" alt="Target Variable Description and Histogram"  style="width:100%;">
-            {% endblock target %}
+        <div class="flex-container">
+            <div class="histogram">
+                {% block target_histogram %}
+                <img class="img-responsive center-img" src="{{ result_dict.target_histogram }}" alt="Target Variable Histogram" style="width:100%;">
+                {% endblock target_histogram %}
+            </div>
+            <div class="table-container">
+                {% block target_table %}
+                {{ result_dict.target_table | safe }}
+                {% endblock target_table %}
+            </div>
         </div>
         {% endblock %}
     </div>

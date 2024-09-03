@@ -62,3 +62,5 @@ title: "TargetViz Report"
 max_target_class: 10
 
 max_scatter_points: 1000
+
+max_lable_len: 30

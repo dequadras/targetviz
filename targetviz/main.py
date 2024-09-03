@@ -219,6 +219,38 @@ def get_quantiles(
     return list_quantiles
 
 
+def truncate_labels(ax, config: ConfigDict):
+    """
+    Truncate labels on the given axis to ensure they have at most a certain length.
+    """
+    max_lable_len = config["max_lable_len"].get(int)
+    # Truncate x-axis labels
+    xlabels = ax.get_xticks()
+    new_xlabels = []
+    for label in ax.get_xticklabels():
+        text = label.get_text()
+        if len(text) > max_lable_len:
+            truncated_text = text[: max_lable_len - 3] + "..."
+        else:
+            truncated_text = text
+        new_xlabels.append(truncated_text)
+    ax.set_xticks(xlabels)
+    ax.set_xticklabels(new_xlabels)
+
+    # Truncate y-axis labels
+    ylabels = ax.get_yticks()
+    new_ylabels = []
+    for label in ax.get_yticklabels():
+        text = label.get_text()
+        if len(text) > max_lable_len:
+            truncated_text = text[: max_lable_len - 3] + "..."
+        else:
+            truncated_text = text
+        new_ylabels.append(truncated_text)
+    ax.set_yticks(ylabels)
+    ax.set_yticklabels(new_ylabels)
+
+
 class BaseAnalyzer:
     """
     Base for analyzer classes TargetAnalyzer and ColumnAnalyzer
@@ -267,13 +299,12 @@ class BaseAnalyzer:
         """
         quantiles = self.config["quantiles"].get(list)
 
-        list_fullsam = ["Full sample"]
+        list_fullsam = []
         list_fullsam.extend(self.get_desc(series, full_samp=True, quantiles=quantiles))
-        list_reduced = ["w/o outliers and nulls"]
+        list_reduced = []
         list_reduced.extend(self.get_desc(series_clean, full_samp=False, quantiles=quantiles))
 
         stat_names = [
-            "Measurement",
             "Number of values",
             "Num. distinct values",
             "Number missing",
@@ -301,22 +332,24 @@ class BaseAnalyzer:
 
         return stat_df
 
-    def create_desc_and_hist(self, series: pd.Series, series_clean: pd.Series) -> str:
+    def create_desc_and_hist(self, series: pd.Series, series_clean: pd.Series) -> Tuple[str, str]:
         """
         This function gets the descriptive variables of the variable and saves a
-        histogram plot
+        histogram plot and generates an HTML table
         """
         desc = self.create_desc_df(series, series_clean)
 
-        # Create figure
-        fig, axs = plt.subplots(1, 2, figsize=tuple(self.config["figures_size"].get(list)))
+        # Create figure for histogram only
+        fig, ax = plt.subplots(figsize=tuple(self.config["figures_size"].get(list)))
 
-        self.plot_table(desc, fig, axs)
+        self.plot_histogram(series_clean, ax)
 
-        self.plot_histogram(series_clean, axs)
+        histogram = plot_360_n0sc0pe()
 
-        desc_and_hist = plot_360_n0sc0pe()
-        return desc_and_hist
+        # Generate HTML table
+        html_table = desc.to_html(classes="table table-striped", index=False)
+
+        return histogram, html_table
 
     def get_desc(self, series: pd.Series, full_samp: bool, quantiles: List[float]) -> List[Any]:
         """
@@ -350,32 +383,13 @@ class BaseAnalyzer:
 
         return list_stat
 
-    def plot_table(self, desc: pd.DataFrame, fig: plt.Figure, axs: List[plt.Axes]) -> None:
-        """
-        Plot table with main statistics about the series
-        """
-        fig.suptitle(
-            "Column {}: univariate and statistical description".format(self.col),
-            size=16,
-        )
-        self.config["table_marg"].get(list)
-        fig.tight_layout(rect=self.config["table_marg"].get(list))
-        ytable = axs[1].table(
-            cellText=desc.values,
-            loc="center",
-            colWidths=self.config["table_cols_width"].get(list),
-        )
-
-        ytable.set_fontsize(self.config["table_font_size"].get(int))
-        axs[1].axis("off")
-
-    def plot_histogram(self, series: pd.Series, axs: List[plt.Axes]) -> None:
+    def plot_histogram(self, series: pd.Series, ax: plt.Axes) -> None:
         """
         Plot histogram of the column, with differences across types
         """
         if self.type in ["CAT", "BINARY"]:
             series.value_counts().nlargest(self.config["hist"]["max_values"].get(int)).plot(
-                kind="bar", ax=axs[0]
+                kind="bar", ax=ax
             )
             plt.title(" ", fontsize=20)
 
@@ -384,15 +398,18 @@ class BaseAnalyzer:
 
             register_matplotlib_converters()
 
-            series.hist(ax=axs[0])
+            series.hist(ax=ax)
             plt.title(" ", fontsize=20)
 
         else:
-            series.hist(bins=30, density=1, ax=axs[0])
-            plot_kde(series, axs[0], self.config)
-            axs[0].set(xlim=(series.min(), series.max()))
-            axs[0].axvline(x=series.mean(), color="orange", linestyle="--")
+            series.hist(bins=30, density=1, ax=ax)
+            plot_kde(series, ax, self.config)
+            ax.set(xlim=(series.min(), series.max()))
+            ax.axvline(x=series.mean(), color="orange", linestyle="--")
             plt.title(" ", fontsize=20)  # Leave space for the real main title
+        truncate_labels(ax, self.config)
+        plt.xticks(rotation=30, ha="right")
+        plt.tight_layout()
 
 
 class TargetAnalyzer(BaseAnalyzer):
@@ -414,7 +431,7 @@ class TargetAnalyzer(BaseAnalyzer):
                 int
             ), f"Number of categories {dfs[self.target].nunique()} is too large"
 
-    def run(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
+    def run(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, str, str]:
         """
         method for running the main function from TargetAnalyzer
         """
@@ -423,9 +440,11 @@ class TargetAnalyzer(BaseAnalyzer):
         data[self.target] = dfs[self.target]
 
         self.check_types(dfs)
-        desc_and_hist = self.create_desc_and_hist(data[self.target], dfs[self.target])
+        target_histogram, target_table = self.create_desc_and_hist(
+            data[self.target], dfs[self.target]
+        )
 
-        return data, desc_and_hist
+        return data, target_histogram, target_table
 
 
 class ColumnAnalyzer(BaseAnalyzer):
@@ -441,7 +460,7 @@ class ColumnAnalyzer(BaseAnalyzer):
         if self.type == "NUM":
             df_clean = df_clean[np.isfinite(df_clean[self.col].values)]  # infinite removed
             if self.config["pct_outliers"].get(float) > 0:
-                # remove outliers (only in numeric result_dict)
+                # remove outliers (only in numeric data)
                 df_clean = self.remove_outliers(df_clean)
         self.rate_non_nulls = df_clean.shape[0] / df_small.shape[0]
         return df_clean
@@ -492,8 +511,8 @@ class ColumnAnalyzer(BaseAnalyzer):
 
         df_clean = self.clean_data(df_small)
         # Create plot of histogram, KDE and descriptive statistics
-        desc_and_hist = self.create_desc_and_hist(df_small[self.col], df_clean[self.col])
-        result_dict[self.col] = {"desc_and_hist": desc_and_hist}
+        col_histogram, col_table = self.create_desc_and_hist(df_small[self.col], df_clean[self.col])
+        result_dict[self.col] = {"histogram": col_histogram, "table": col_table}
 
         cut_series = self.get_buckets(df_clean)
 
@@ -524,6 +543,7 @@ class ColumnAnalyzer(BaseAnalyzer):
         target_type = self.config["target_type"].get(str)
         if target_type == "NUM":
             df_small[self.target].groupby(cut_col, observed=False).mean().plot(ax=ax1)
+            truncate_labels(ax1, self.config)
             plt.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
         elif target_type in ["BINARY", "CAT"]:
             target_values = np.sort(df_small[self.target].unique())
@@ -538,12 +558,14 @@ class ColumnAnalyzer(BaseAnalyzer):
                 )
                 legend_vals.append(target_val)
             plt.legend(legend_vals)
+            truncate_labels(ax1, self.config)
             plt.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
 
         ax1.set_ylabel(self.target + " mean")
         ax2 = plt.subplot2grid((2, 2), (1, 1), sharex=ax1)
         cut_col.value_counts().sort_index().plot(kind="bar", ax=ax2)
         ax2.set_ylabel("Count")
+        truncate_labels(ax2, self.config)
         plt.xticks(rotation=30, ha="right")
         plt.tight_layout()
 
@@ -559,6 +581,9 @@ class ColumnAnalyzer(BaseAnalyzer):
         if self.type in ["CAT", "BINARY", "DATE"]:
             if target_type == "NUM":
                 sns.boxplot(x=cut_col, y=df_small[self.target], showfliers=False, ax=ax0)
+                truncate_labels(ax0, self.config)
+                ax0.set_xticks(range(len(ax0.get_xticklabels())))
+                ax0.set_xticklabels(ax0.get_xticklabels(), rotation=30, ha="right")
             elif target_type in ["BINARY", "CAT"]:
                 data: pd.DataFrame = pd.DataFrame(
                     data={self.col: cut_col, self.target: df_small[self.target]}
@@ -569,6 +594,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                 data = data.pivot(index=self.col, columns=self.target, values=0)
                 data = data / data.sum()  # normalize
                 sns.heatmap(data, cmap=cmap, ax=ax0)
+                truncate_labels(ax0, self.config)
         else:
             if target_type == "NUM":
                 if df_small.shape[0] > max_scatter_points:
@@ -577,6 +603,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                 else:
                     sns.scatterplot(x=df_small[self.col], y=df_small[self.target], ax=ax0)
                 ax0.set(xlim=(df_small[self.col].min(), df_small[self.col].max()))
+                truncate_labels(ax0, self.config)
             elif target_type in ["BINARY", "CAT"]:
                 sns.boxplot(
                     x=df_small[self.col],
@@ -585,6 +612,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                     orient="h",
                     showfliers=False,
                 )
+                truncate_labels(ax0, self.config)
         plt.title(" ", fontsize=20)  # necessary so that space is left for main title
 
     def get_buckets(self, df_small: pd.DataFrame) -> pd.Series:
@@ -686,7 +714,12 @@ class ColumnAnalyzer(BaseAnalyzer):
             series_target.groupby(cut_series, observed=False).var(ddof=0).values
             * series_target.groupby(cut_series, observed=False).count().values
         ).sum()
-        return 1 - non_exp_variance / variance
+
+        # Handle the case where variance is zero to avoid division by zero
+        if variance == 0:
+            return 0.0  # If variance is zero, there's no variation to explain
+        else:
+            return 1 - non_exp_variance / variance
 
 
 def set_default_params(
@@ -776,8 +809,9 @@ def targetviz_report(
     result_dict: ResultDict = {"target": target}
 
     target_analyzer = TargetAnalyzer(target, config, log)
-    data, desc_and_hist_target = target_analyzer.run(data)
-    result_dict["desc_and_hist_target"] = desc_and_hist_target
+    data, target_histogram, target_table = target_analyzer.run(data)
+    result_dict["target_histogram"] = target_histogram
+    result_dict["target_table"] = target_table
     config.__setitem__("target_type", target_analyzer.type)
 
     total_cols: int = len(columns)
