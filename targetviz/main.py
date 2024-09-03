@@ -20,7 +20,7 @@ from jinja2 import Template
 
 from targetviz.config import config
 
-if sys.version_info >= (3, 9):
+if sys.version_info >= (3, 10):
     from importlib.resources import files
 else:
     from importlib_resources import files
@@ -37,11 +37,11 @@ class DescParams(TypedDict):
     formatter: Callable[[Union[float, datetime]], str]
 
 
-def _get_template_path(fname: str) -> str:
+def _get_template_path(fname: str) -> os.PathLike:
     """
     Returns the full path to a template file
     """
-    return str(files("targetviz.templates").joinpath(fname))
+    return files("targetviz.templates").joinpath(fname)
 
 
 def create_log(timestamp: str, output_dir: str, log_name: Optional[str] = None) -> logging.Logger:
