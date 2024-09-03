@@ -24,6 +24,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pre-commit pytest
+        pip install -e .  # Install the package in editable mode
     - name: Run pre-commit hooks
       if: matrix.python-version == '3.11'
       run: pre-commit run --all-files
