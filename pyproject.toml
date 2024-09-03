@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "targetviz"
+dynamic = ["version"]
+description = "Package for generating automatic reports of variable analyses"
+readme = "README.md"
+authors = [{name = "Luis de Quadras"}]
+requires-python = ">=3.7"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+]
+dependencies = []  # We'll read these dynamically from requirements.txt
+
+[project.urls]
+Homepage = "https://github.com/dequadras/targetviz"
+
+[tool.setuptools]
+packages = ["targetviz"]
+
+[tool.setuptools.package-data]
+targetviz = ["templates/*.html", "config_default.yaml"]

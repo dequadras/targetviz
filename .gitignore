@@ -1,0 +1,15 @@
+data/*
+figures
+notebooks
+models
+.idea/
+.vscode/
+__pycache__/
+*.html
+*.egg-info
+.DS_Store
+next_steps.md
+
+# exceptions
+!samples/*html
+!targetviz/templates/*html

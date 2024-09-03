@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TargetViz Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .img-responsive {
+            max-width: 100%;
+            height: auto;
+        }
+        .center-img {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Analysis of the Relationship of Variables to a Target Variable</h1>
+
+    <div>
+        {% block content %}
+        <h2>TARGET</h2>
+        <div>
+            {% block target %}
+            <img class="img-responsive center-img" src="{{ result_dict.desc_and_hist_target }}" alt="Target Variable Description and Histogram"  style="width:100%;">
+            {% endblock target %}
+        </div>
+        {% endblock %}
+    </div>
+</body>
+</html>
