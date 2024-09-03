@@ -1,0 +1,64 @@
+# percentage of outliers. Outliers are removed based on percentile
+pct_outliers: 0
+
+# PLOT PARAMETERS
+figures_size:
+  - 12
+  - 6
+
+## HISTOGRAM ##
+hist:
+  # maximum number of values to use in histogram in a categorical variable
+  max_values: 20
+kde:
+  # Maximum points to use for KDE, under that, itt will be sampled
+  max_sample: 10000
+  # number of evaluation points for the kde
+  ind: 200
+
+# DESCRIPTIVE TABLE #
+# margins for ploted table
+# Per variable type description settings
+quantiles:
+  - 0.01
+  - 0.05
+  - 0.25
+  - 0.75
+  - 0.95
+  - 0.99
+table_marg:
+  - 0
+  - 0.03
+  - 1
+  - 0.95
+table_cols_width:
+  - 0.4
+  - 0.3
+  - 0.3
+table_font_size: 15
+
+# VARIABLE VS TARGET RELATION PLOT #
+heatmap:
+  cmap: YlGnBu
+
+# BUCKETED VARIABLE #
+# number of bins to use for the output plots and explained variance calculation
+n_breaks: 10
+qcut_precision: 3
+
+# BUCKETED VARIABLE BARPLOT
+
+# BUCKETED VARIABLE VS TARGET PLOT
+plot_0_in_binary_target: False
+
+## OTHER PARAMETERS #
+# File name
+name_file_out: default
+
+# Title of the document
+title: "TargetViz Report"
+
+# Maximum number of classes, if surpassed error is raised
+max_target_class: 10
+
+max_scatter_points: 1000

@@ -1,0 +1,15 @@
+<h2>----------------</h2>
+<h2>Column: {{ column }}</h2>
+<p>Explained Variance: {{ "{:.2f}%".format(result_dict[column]['explained_var'] * 100) }}</p>
+
+<div>
+    {% block self_fig %}
+    <img src="{{ result_dict[column]['desc_and_hist'] }}" alt="Descriptive Statistics and Histogram" style="width:100%;"/>
+    {% endblock self_fig %}
+</div>
+
+<div>
+    {% block rel_fig %}
+    <img src="{{ result_dict[column]['rel_fig'] }}" alt="Relationship with Target Variable" style="width:100%;"/>
+    {% endblock rel_fig %}
+</div>
