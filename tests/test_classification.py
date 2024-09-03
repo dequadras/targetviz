@@ -1,6 +1,7 @@
 """
 Tests corresponding to target variables that are multiclass
 """
+
 import numpy as np
 import pandas as pd
 from sklearn import datasets
