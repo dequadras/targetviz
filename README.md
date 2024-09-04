@@ -2,22 +2,12 @@
 This library generates HTML reports relating a target variable with all the dependent variables of a dataset.
 
 ## Installation
-You can install TargetViz either by cloning the repository or directly from GitHub:
+You can install TargetViz using pip
 
-### Option 1: Clone and install
-```sh
-git clone https://github.com/dequadras/targetviz.git
-cd targetviz && pip install .
+```bash
+pip install targetviz
 ```
 
-### Option 2: Install directly from GitHub
-```sh
-# install using SSH
-pip install git+ssh://git@github.com:dequadras/targetviz.git
-
-# install from HTTPS
-pip install git+https://github.com/dequadras/targetviz.git
-```
 
 ## Example
 To generate an HTML report, just use the `targetviz_report` function, passing as arguments the dataset and indicating the name of the target variable.
