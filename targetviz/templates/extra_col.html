@@ -2,10 +2,17 @@
 <h2>Column: {{ column }}</h2>
 <p>Explained Variance: {{ "{:.2f}%".format(result_dict[column]['explained_var'] * 100) }}</p>
 
-<div>
-    {% block self_fig %}
-    <img src="{{ result_dict[column]['desc_and_hist'] }}" alt="Descriptive Statistics and Histogram" style="width:100%;"/>
-    {% endblock self_fig %}
+<div class="flex-container">
+    <div class="histogram">
+        {% block column_histogram %}
+        <img class="img-responsive center-img" src="{{ result_dict[column]['histogram'] }}" alt="Column Histogram" style="width:100%;">
+        {% endblock column_histogram %}
+    </div>
+    <div class="table-container">
+        {% block column_table %}
+        {{ result_dict[column]['table'] | safe }}
+        {% endblock column_table %}
+    </div>
 </div>
 
 <div>
@@ -13,3 +20,23 @@
     <img src="{{ result_dict[column]['rel_fig'] }}" alt="Relationship with Target Variable" style="width:100%;"/>
     {% endblock rel_fig %}
 </div>
+
+<style>
+    .table-container {
+        width: 48%;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em; /* Slightly reduce font size */
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 4px; /* Reduce padding */
+        text-align: left;
+        line-height: 1.2; /* Reduce line height */
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+</style>

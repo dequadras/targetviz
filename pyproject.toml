@@ -4,9 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "targetviz"
-dynamic = ["version"]
-description = "Package for generating automatic reports of variable analyses"
+version = "0.0.1"
+description = "Package for generating automatic reports of variable analyses related to a target variable"
 readme = "README.md"
+license = { file = "LICENSE" }
 authors = [{name = "Luis de Quadras"}]
 requires-python = ">=3.8"
 classifiers = [
@@ -16,13 +17,24 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.8",
 ]
-dependencies = []  # We'll read these dynamically from requirements.txt
+keywords = ["targetviz", "data analysis", "data visualization", "data science"]
+dependencies = [
+    "confuse",
+    'importlib-resources; python_version < "3.10"',
+    "jinja2",
+    "matplotlib>3.3",
+    "numpy>1.22",
+    "pandas>1.2",
+    "scikit-learn>1.0",
+    "seaborn>0.11",
+]
 
 [project.urls]
 Homepage = "https://github.com/dequadras/targetviz"
 
 [tool.setuptools]
 packages = ["targetviz"]
+include-package-data = true
 
 [tool.setuptools.package-data]
 targetviz = ["templates/*.html", "config_default.yaml"]
