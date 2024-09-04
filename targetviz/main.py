@@ -391,22 +391,18 @@ class BaseAnalyzer:
             series.value_counts().nlargest(self.config["hist"]["max_values"].get(int)).plot(
                 kind="bar", ax=ax
             )
-            plt.title(" ", fontsize=20)
-
         elif self.type == "DATE":
             from pandas.plotting import register_matplotlib_converters
 
             register_matplotlib_converters()
 
             series.hist(ax=ax)
-            plt.title(" ", fontsize=20)
-
         else:
             series.hist(bins=30, density=1, ax=ax)
             plot_kde(series, ax, self.config)
             ax.set(xlim=(series.min(), series.max()))
             ax.axvline(x=series.mean(), color="orange", linestyle="--")
-            plt.title(" ", fontsize=20)  # Leave space for the real main title
+        ax.set_title(f"Distribution of {self.col}", fontsize=20)
         truncate_labels(ax, self.config)
         plt.xticks(rotation=30, ha="right")
         plt.tight_layout()
