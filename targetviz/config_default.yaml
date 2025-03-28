@@ -5,6 +5,7 @@ pct_outliers: 0
 figures_size:
   - 12
   - 6
+dpi: 100
 
 ## HISTOGRAM ##
 hist:
