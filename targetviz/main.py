@@ -767,6 +767,7 @@ def plot_360_n0sc0pe() -> str:
     plt.savefig(
         image_bytes,
         format="png",
+        dpi=config["dpi"].get(int),
     )
     plt.close()
     result_string = base64_image(image_bytes.getvalue(), "image/png")
@@ -794,10 +795,9 @@ def targetviz_report(
     timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
     config.__setitem__("timestamp", timestamp)
 
-    # Add the new default parameter
-    config.__setitem__("max_scatter_points", 1000)
-
+    # Apply kwargs which will override any defaults
     config.set_kwargs(kwargs)
+
     columns, name_file_out = set_default_params(config, columns, target, data)
 
     log = create_log(timestamp, output_dir, log_name=name_file_out.replace(".html", ".log"))
