@@ -757,7 +757,6 @@ def plot_360_n0sc0pe() -> str:
     """
     svg_buffer = StringIO()
     # Save directly to SVG string. bbox_inches="tight" helps prevent cropping.
-    # No need for DPI with SVG.
     plt.savefig(svg_buffer, format="svg")
     plt.close()  # Close the figure to free memory
     svg_content = svg_buffer.getvalue()
