@@ -2,6 +2,8 @@
 Test speed for big datasets
 """
 
+import tempfile
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -48,7 +50,8 @@ def report_big_df():
     Perform report for big dataframe with continuous variable
     """
     big_df = create_big_dataset()
-    targetviz_report(big_df, "target")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        targetviz_report(big_df, "target", output_dir=temp_dir + "/")
 
 
 def report_big_df_cat():
@@ -56,7 +59,8 @@ def report_big_df_cat():
     Perform report for big dataframe with categorical variable
     """
     big_cat_df = create_big_cat_dataset()
-    targetviz_report(big_cat_df, "target")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        targetviz_report(big_cat_df, "target", output_dir=temp_dir + "/")
 
 
 @pytest.mark.skip(reason="Test is slow and should only be used manually")

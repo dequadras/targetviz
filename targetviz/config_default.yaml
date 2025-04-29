@@ -1,11 +1,10 @@
 # percentage of outliers. Outliers are removed based on percentile
-pct_outliers: 0
+pct_outliers: 0.05
 
 # PLOT PARAMETERS
 figures_size:
   - 12
   - 6
-dpi: 100
 
 ## HISTOGRAM ##
 hist:

@@ -2,15 +2,14 @@
 Module containing all functionality for the targetviz report
 """
 
-import base64
 import logging
 import os
 import sys
+import zipfile
 from collections.abc import Sequence
 from datetime import datetime
-from io import BytesIO
+from io import StringIO
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypedDict, Union
-from urllib.parse import quote
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,12 +43,10 @@ def _get_template_path(fname: str) -> os.PathLike:
     return files("targetviz.templates").joinpath(fname)
 
 
-def create_log(timestamp: str, output_dir: str, log_name: Optional[str] = None) -> logging.Logger:
+def create_log() -> logging.Logger:
     """
-    Create logger and formatters, and handlers
+    Create logger and formatters for console output
     """
-    if log_name is None:
-        log_name = f"targetviz_analysis_{timestamp}.log"
     log_format = "%(asctime)s %(levelname)-8s %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
@@ -58,12 +55,6 @@ def create_log(timestamp: str, output_dir: str, log_name: Optional[str] = None) 
     )
 
     log = logging.getLogger("targetviz")
-
-    file_handler = logging.FileHandler(os.path.join(output_dir, log_name))
-
-    formatter = logging.Formatter(log_format, datefmt=date_format)
-    file_handler.setFormatter(formatter)
-    log.addHandler(file_handler)
 
     return log
 
@@ -115,28 +106,44 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
     """
     Create html file, populate and render file
     """
-
     # Create html file and render
     base_html = _get_template_path("base.html")
 
     # fill jinja template with data
-    with open(base_html, "r") as file:
+    # Use UTF-8 encoding when reading template files
+    with open(base_html, "r", encoding="utf-8") as file:
         template = Template(file.read())
     extra_html = _get_template_path("extra_col.html")
 
     used_cols = sort_cols_by_exp_var(result_dict, columns)
     html = template.render(result_dict=result_dict, columns=columns)
 
-    with open(extra_html, "r") as file:
+    # Use UTF-8 encoding when reading template files
+    with open(extra_html, "r", encoding="utf-8") as file:
         extra_template = Template(file.read())
 
     for col in used_cols:
         html_out = extra_template.render(result_dict=result_dict, column=col)
         html += html_out
 
-    # write to file
-    with open(name_html, "w") as f:
-        f.write(html)
+    # Check if output should be zipped
+    if name_html.endswith(".html.zip"):
+        # Create temporary HTML file
+        html_filename = name_html[:-4]  # Remove .zip extension
+        # Specify UTF-8 encoding when writing the temporary HTML file
+        with open(html_filename, "w", encoding="utf-8") as f:
+            f.write(html)
+
+        # Create zip file
+        with zipfile.ZipFile(name_html, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(html_filename, os.path.basename(html_filename))
+
+        # Remove temporary HTML file
+        os.remove(html_filename)
+    else:
+        # Specify UTF-8 encoding when writing the final HTML file
+        with open(name_html, "w", encoding="utf-8") as f:
+            f.write(html)
 
 
 def get_num_values(series: pd.Series) -> int:
@@ -730,8 +737,9 @@ def set_default_params(
         timestamp = config_["timestamp"].get(str)
         name_file_out = "targetviz_report_{}.html".format(timestamp)
 
-    # if name does not end in .html append it
-    name_file_out = name_file_out if name_file_out.endswith(".html") else name_file_out + ".html"
+    # Check if file should end with html or html.zip
+    if not (name_file_out.endswith(".html") or name_file_out.endswith(".html.zip")):
+        name_file_out = name_file_out + ".html"
 
     if columns is None:
         columns = list(set(data.columns).difference([target]))
@@ -741,38 +749,20 @@ def set_default_params(
     return columns, name_file_out
 
 
-def base64_image(image: bytes, mime_type: str) -> str:
-    """Encode the image for an URL using base64
-
-    Args:
-        image: the image
-        mime_type: the mime type
-
-    Returns:
-        A string starting with "data:{mime_type};base64,"
-    """
-    base64_data = base64.b64encode(image)
-    image_data = quote(base64_data)
-    return f"data:{mime_type};base64,{image_data}"
-
-
 def plot_360_n0sc0pe() -> str:
-    """Quickscope the plot to a base64 encoded string.
+    """Saves the current plot directly as an SVG string.
 
     Returns:
-        A base64 encoded version of the plot in the specified image format.
+        A string containing the SVG representation of the plot.
     """
+    svg_buffer = StringIO()
+    # Save directly to SVG string. bbox_inches="tight" helps prevent cropping.
+    plt.savefig(svg_buffer, format="svg")
+    plt.close()  # Close the figure to free memory
+    svg_content = svg_buffer.getvalue()
+    svg_buffer.close()
 
-    image_bytes = BytesIO()
-    plt.savefig(
-        image_bytes,
-        format="png",
-        dpi=config["dpi"].get(int),
-    )
-    plt.close()
-    result_string = base64_image(image_bytes.getvalue(), "image/png")
-
-    return result_string
+    return svg_content
 
 
 def targetviz_report(
@@ -800,7 +790,7 @@ def targetviz_report(
 
     columns, name_file_out = set_default_params(config, columns, target, data)
 
-    log = create_log(timestamp, output_dir, log_name=name_file_out.replace(".html", ".log"))
+    log = create_log()
 
     result_dict: ResultDict = {"target": target}
 

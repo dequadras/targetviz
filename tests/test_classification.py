@@ -2,6 +2,8 @@
 Tests corresponding to target variables that are multiclass
 """
 
+import tempfile
+
 import numpy as np
 import pandas as pd
 from sklearn import datasets
@@ -29,7 +31,8 @@ def test_iris():
     iris_df = sklearn_to_df(iris)
     iris_df["target"] = iris.target_names[iris_df.target]
 
-    targetviz_report(iris_df, "target")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        targetviz_report(iris_df, "target", output_dir=temp_dir + "/")
 
 
 def test_cancer():
@@ -40,7 +43,10 @@ def test_cancer():
     breast_cancer_df = sklearn_to_df(breast_cancer)
     breast_cancer_df["target"] = breast_cancer.target_names[breast_cancer_df.target]
 
-    targetviz_report(breast_cancer_df, "target", columns=["worst area"])
+    with tempfile.TemporaryDirectory() as temp_dir:
+        targetviz_report(
+            breast_cancer_df, "target", columns=["worst area"], output_dir=temp_dir + "/"
+        )
 
 
 def test_heatmap():
@@ -50,4 +56,5 @@ def test_heatmap():
             "cat_var": np.random.choice(["var1", "var2", "var3"], size=100),
         }
     )
-    targetviz_report(df, "target")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        targetviz_report(df, "target", output_dir=temp_dir + "/")

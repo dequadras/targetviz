@@ -3,40 +3,45 @@
 <p>Explained Variance: {{ "{:.2f}%".format(result_dict[column]['explained_var'] * 100) }}</p>
 
 <div class="flex-container">
-    <div class="histogram">
+    <div class="histogram" style="width: 48%; float: left; margin-right: 2%;">
         {% block column_histogram %}
-        <img class="img-responsive center-img" src="{{ result_dict[column]['histogram'] }}" alt="Column Histogram" style="width:100%;">
+        {{ result_dict[column]['histogram'] | safe }}
         {% endblock column_histogram %}
     </div>
-    <div class="table-container">
+    <div class="table-container" style="width: 48%; float: left;">
         {% block column_table %}
         {{ result_dict[column]['table'] | safe }}
         {% endblock column_table %}
     </div>
+    <div style="clear: both;"></div>
 </div>
 
-<div>
+<div style="width:100%;">
     {% block rel_fig %}
-    <img src="{{ result_dict[column]['rel_fig'] }}" alt="Relationship with Target Variable" style="width:100%;"/>
+    {{ result_dict[column]['rel_fig'] | safe }}
     {% endblock rel_fig %}
 </div>
 
 <style>
-    .table-container {
-        width: 48%;
-    }
-    table {
+    .table-container table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.9em; /* Slightly reduce font size */
+        font-size: 0.9em;
     }
-    th, td {
+    .table-container th, .table-container td {
         border: 1px solid #ddd;
-        padding: 4px; /* Reduce padding */
+        padding: 4px;
         text-align: left;
-        line-height: 1.2; /* Reduce line height */
+        line-height: 1.2;
     }
-    th {
+    .table-container th {
         background-color: #f2f2f2;
+    }
+
+    .histogram svg,
+    div[style="width:100%;"] svg {
+        width: 100%;
+        height: auto;
+        display: block;
     }
 </style>
