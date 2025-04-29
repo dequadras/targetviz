@@ -2,15 +2,19 @@
 Implement test for targetviz report
 """
 
+import tempfile
 from time import sleep
 from unittest.mock import MagicMock, Mock
 
+import matplotlib
 import numpy as np
 import pandas as pd
 from sklearn import datasets
 
 from targetviz.config import config
 from targetviz.main import BaseAnalyzer, ColumnAnalyzer, targetviz_report
+
+matplotlib.use("Agg")  # Use non-interactive backend for tests
 
 
 def sklearn_to_df(sklearn_dataset):
@@ -132,21 +136,26 @@ def test_targetviz():
     """
     Test cases for targetviz, asserting that no error arises during runtime
     """
-    df_cal = sklearn_to_df(datasets.fetch_california_housing())
-    target_col = "target"
-    assert targetviz_report(df_cal, target_col) is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        df_cal = sklearn_to_df(datasets.fetch_california_housing())
+        target_col = "target"
+        assert targetviz_report(df_cal, target_col, output_dir=temp_dir + "/") is None
 
-    data = create_cat_dataset()
-    assert targetviz_report(data, "target") is None
+        data = create_cat_dataset()
+        assert targetviz_report(data, "target", output_dir=temp_dir + "/") is None
 
-    df_nan = create_nan_dataset()
-    assert targetviz_report(df_nan, "target", pct_outliers=0.05) is None
+        df_nan = create_nan_dataset()
+        assert (
+            targetviz_report(df_nan, "target", pct_outliers=0.05, output_dir=temp_dir + "/") is None
+        )
 
-    df_dt = create_dt_dataset()
-    assert targetviz_report(df_dt, "target", pct_outliers=0.05) is None
+        df_dt = create_dt_dataset()
+        assert (
+            targetviz_report(df_dt, "target", pct_outliers=0.05, output_dir=temp_dir + "/") is None
+        )
 
-    df_unique = create_df_unique()
-    assert targetviz_report(df_unique, "target", output_dir="./") is None
+        df_unique = create_df_unique()
+        assert targetviz_report(df_unique, "target", output_dir=temp_dir + "/") is None
 
 
 def test_calc_explained_var():
@@ -259,43 +268,45 @@ def test_get_desc():
 
 
 def test_numeric_name():
-    sleep(1)  # make sure folder names change since last test
-    df_names_num = pd.DataFrame({"pred": [0, 1, 2, 3], "0": [2, 3, 4, 5], 0: [7, 8, 9, 0]})
-    targetviz_report(df_names_num, "pred", n_breaks=2)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        sleep(1)  # make sure folder names change since last test
+        df_names_num = pd.DataFrame({"pred": [0, 1, 2, 3], "0": [2, 3, 4, 5], 0: [7, 8, 9, 0]})
+        targetviz_report(df_names_num, "pred", n_breaks=2, output_dir=temp_dir + "/")
 
 
 def test_nullable_types():
-    # Test with Int (nullable int)
-    df_int = pd.DataFrame(
-        {"target": [1, 2, 3, 4, pd.NA], "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64")}
-    )
-    assert targetviz_report(df_int, "target") is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Test with Int (nullable int)
+        df_int = pd.DataFrame(
+            {"target": [1, 2, 3, 4, pd.NA], "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64")}
+        )
+        assert targetviz_report(df_int, "target", output_dir=temp_dir + "/") is None
 
-    # Test with Float (nullable float)
-    df_float = pd.DataFrame(
-        {
-            "target": [1.0, 2.0, 3.0, 4.0, pd.NA],
-            "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
-        }
-    )
-    assert targetviz_report(df_float, "target") is None
+        # Test with Float (nullable float)
+        df_float = pd.DataFrame(
+            {
+                "target": [1.0, 2.0, 3.0, 4.0, pd.NA],
+                "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
+            }
+        )
+        assert targetviz_report(df_float, "target", output_dir=temp_dir + "/") is None
 
-    # Test with Bool (nullable boolean)
-    df_bool = pd.DataFrame(
-        {
-            "target": [True, False, True, False, pd.NA],
-            "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
-        }
-    )
-    assert targetviz_report(df_bool, "target") is None
+        # Test with Bool (nullable boolean)
+        df_bool = pd.DataFrame(
+            {
+                "target": [True, False, True, False, pd.NA],
+                "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
+            }
+        )
+        assert targetviz_report(df_bool, "target", output_dir=temp_dir + "/") is None
 
-    # Test with mixed types
-    df_mixed = pd.DataFrame(
-        {
-            "target": [1, 2, 3, 4, 5],
-            "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64"),
-            "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
-            "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
-        }
-    )
-    assert targetviz_report(df_mixed, "target") is None
+        # Test with mixed types
+        df_mixed = pd.DataFrame(
+            {
+                "target": [1, 2, 3, 4, 5],
+                "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64"),
+                "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
+                "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
+            }
+        )
+        assert targetviz_report(df_mixed, "target", output_dir=temp_dir + "/") is None
