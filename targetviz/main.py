@@ -2,16 +2,14 @@
 Module containing all functionality for the targetviz report
 """
 
-import base64
 import logging
 import os
 import sys
 import zipfile
 from collections.abc import Sequence
 from datetime import datetime
-from io import BytesIO
+from io import StringIO
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypedDict, Union
-from urllib.parse import quote
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -112,14 +110,16 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
     base_html = _get_template_path("base.html")
 
     # fill jinja template with data
-    with open(base_html, "r") as file:
+    # Use UTF-8 encoding when reading template files
+    with open(base_html, "r", encoding="utf-8") as file:
         template = Template(file.read())
     extra_html = _get_template_path("extra_col.html")
 
     used_cols = sort_cols_by_exp_var(result_dict, columns)
     html = template.render(result_dict=result_dict, columns=columns)
 
-    with open(extra_html, "r") as file:
+    # Use UTF-8 encoding when reading template files
+    with open(extra_html, "r", encoding="utf-8") as file:
         extra_template = Template(file.read())
 
     for col in used_cols:
@@ -130,7 +130,8 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
     if name_html.endswith(".html.zip"):
         # Create temporary HTML file
         html_filename = name_html[:-4]  # Remove .zip extension
-        with open(html_filename, "w") as f:
+        # Specify UTF-8 encoding when writing the temporary HTML file
+        with open(html_filename, "w", encoding="utf-8") as f:
             f.write(html)
 
         # Create zip file
@@ -140,8 +141,8 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
         # Remove temporary HTML file
         os.remove(html_filename)
     else:
-        # write directly to HTML file
-        with open(name_html, "w") as f:
+        # Specify UTF-8 encoding when writing the final HTML file
+        with open(name_html, "w", encoding="utf-8") as f:
             f.write(html)
 
 
@@ -748,38 +749,21 @@ def set_default_params(
     return columns, name_file_out
 
 
-def base64_image(image: bytes, mime_type: str) -> str:
-    """Encode the image for an URL using base64
-
-    Args:
-        image: the image
-        mime_type: the mime type
-
-    Returns:
-        A string starting with "data:{mime_type};base64,"
-    """
-    base64_data = base64.b64encode(image)
-    image_data = quote(base64_data)
-    return f"data:{mime_type};base64,{image_data}"
-
-
 def plot_360_n0sc0pe() -> str:
-    """Quickscope the plot to a base64 encoded string.
+    """Saves the current plot directly as an SVG string.
 
     Returns:
-        A base64 encoded version of the plot in the specified image format.
+        A string containing the SVG representation of the plot.
     """
+    svg_buffer = StringIO()
+    # Save directly to SVG string. bbox_inches="tight" helps prevent cropping.
+    # No need for DPI with SVG.
+    plt.savefig(svg_buffer, format="svg")
+    plt.close()  # Close the figure to free memory
+    svg_content = svg_buffer.getvalue()
+    svg_buffer.close()
 
-    image_bytes = BytesIO()
-    plt.savefig(
-        image_bytes,
-        format="png",
-        dpi=config["dpi"].get(int),
-    )
-    plt.close()
-    result_string = base64_image(image_bytes.getvalue(), "image/png")
-
-    return result_string
+    return svg_content
 
 
 def targetviz_report(
