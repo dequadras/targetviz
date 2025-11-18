@@ -310,3 +310,15 @@ def test_nullable_types():
             }
         )
         assert targetviz_report(df_mixed, "target", output_dir=temp_dir + "/") is None
+
+
+def test_unsigned_integer_types():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        df_uint = pd.DataFrame(
+            {
+                "target": [1, 2, 3, 4, 5],
+                "uint8_col": pd.array([1, 2, 3, 4, 5], dtype="uint8"),
+                "uint16_col": pd.array([100, 200, 300, 400, 500], dtype="uint16"),
+            }
+        )
+        assert targetviz_report(df_uint, "target", output_dir=temp_dir + "/") is None
