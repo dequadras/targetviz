@@ -2,9 +2,11 @@
 Implement test for targetviz report
 """
 
+import tempfile
 from time import sleep
 from unittest.mock import MagicMock, Mock
 
+import matplotlib
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,6 +15,8 @@ from sklearn import datasets
 from targetviz.analyzers import BaseAnalyzer, ColumnAnalyzer
 from targetviz.config import config
 from targetviz.profile_report import targetviz_report
+
+matplotlib.use("Agg")  # Use non-interactive backend for tests
 
 
 def _has_pyarrow():
@@ -143,21 +147,26 @@ def test_targetviz():
     """
     Test cases for targetviz, asserting that no error arises during runtime
     """
-    df_cal = sklearn_to_df(datasets.fetch_california_housing())
-    target_col = "target"
-    assert targetviz_report(df_cal, target_col) is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        df_cal = sklearn_to_df(datasets.fetch_california_housing())
+        target_col = "target"
+        assert targetviz_report(df_cal, target_col, output_dir=temp_dir + "/") is None
 
-    data = create_cat_dataset()
-    assert targetviz_report(data, "target") is None
+        data = create_cat_dataset()
+        assert targetviz_report(data, "target", output_dir=temp_dir + "/") is None
 
-    df_nan = create_nan_dataset()
-    assert targetviz_report(df_nan, "target", pct_outliers=0.05) is None
+        df_nan = create_nan_dataset()
+        assert (
+            targetviz_report(df_nan, "target", pct_outliers=0.05, output_dir=temp_dir + "/") is None
+        )
 
-    df_dt = create_dt_dataset()
-    assert targetviz_report(df_dt, "target", pct_outliers=0.05) is None
+        df_dt = create_dt_dataset()
+        assert (
+            targetviz_report(df_dt, "target", pct_outliers=0.05, output_dir=temp_dir + "/") is None
+        )
 
-    df_unique = create_df_unique()
-    assert targetviz_report(df_unique, "target", output_dir="./") is None
+        df_unique = create_df_unique()
+        assert targetviz_report(df_unique, "target", output_dir=temp_dir + "/") is None
 
 
 def test_calc_explained_var():
@@ -270,46 +279,48 @@ def test_get_desc():
 
 
 def test_numeric_name():
-    sleep(1)  # make sure folder names change since last test
-    df_names_num = pd.DataFrame({"pred": [0, 1, 2, 3], "0": [2, 3, 4, 5], 0: [7, 8, 9, 0]})
-    targetviz_report(df_names_num, "pred", n_breaks=2)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        sleep(1)  # make sure folder names change since last test
+        df_names_num = pd.DataFrame({"pred": [0, 1, 2, 3], "0": [2, 3, 4, 5], 0: [7, 8, 9, 0]})
+        targetviz_report(df_names_num, "pred", n_breaks=2, output_dir=temp_dir + "/")
 
 
 def test_nullable_types():
-    # Test with Int (nullable int)
-    df_int = pd.DataFrame(
-        {"target": [1, 2, 3, 4, pd.NA], "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64")}
-    )
-    assert targetviz_report(df_int, "target") is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Test with Int (nullable int)
+        df_int = pd.DataFrame(
+            {"target": [1, 2, 3, 4, pd.NA], "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64")}
+        )
+        assert targetviz_report(df_int, "target", output_dir=temp_dir + "/") is None
 
-    # Test with Float (nullable float)
-    df_float = pd.DataFrame(
-        {
-            "target": [1.0, 2.0, 3.0, 4.0, pd.NA],
-            "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
-        }
-    )
-    assert targetviz_report(df_float, "target") is None
+        # Test with Float (nullable float)
+        df_float = pd.DataFrame(
+            {
+                "target": [1.0, 2.0, 3.0, 4.0, pd.NA],
+                "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
+            }
+        )
+        assert targetviz_report(df_float, "target", output_dir=temp_dir + "/") is None
 
-    # Test with Bool (nullable boolean)
-    df_bool = pd.DataFrame(
-        {
-            "target": [True, False, True, False, pd.NA],
-            "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
-        }
-    )
-    assert targetviz_report(df_bool, "target") is None
+        # Test with Bool (nullable boolean)
+        df_bool = pd.DataFrame(
+            {
+                "target": [True, False, True, False, pd.NA],
+                "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
+            }
+        )
+        assert targetviz_report(df_bool, "target", output_dir=temp_dir + "/") is None
 
-    # Test with mixed types
-    df_mixed = pd.DataFrame(
-        {
-            "target": [1, 2, 3, 4, 5],
-            "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64"),
-            "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
-            "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
-        }
-    )
-    assert targetviz_report(df_mixed, "target") is None
+        # Test with mixed types
+        df_mixed = pd.DataFrame(
+            {
+                "target": [1, 2, 3, 4, 5],
+                "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64"),
+                "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
+                "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
+            }
+        )
+        assert targetviz_report(df_mixed, "target", output_dir=temp_dir + "/") is None
 
 
 def test_uint_types():
@@ -317,56 +328,58 @@ def test_uint_types():
     np.random.seed(42)
     n = 50
 
-    # numpy uint types
-    df = pd.DataFrame(
-        {
-            "target": np.random.normal(10, size=n),
-            "uint8_col": np.random.randint(0, 100, size=n).astype(np.uint8),
-            "uint16_col": np.random.randint(0, 1000, size=n).astype(np.uint16),
-            "uint32_col": np.random.randint(0, 10000, size=n).astype(np.uint32),
-            "uint64_col": np.random.randint(0, 10000, size=n).astype(np.uint64),
-        }
-    )
-    assert targetviz_report(df, "target") is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # numpy uint types
+        df = pd.DataFrame(
+            {
+                "target": np.random.normal(10, size=n),
+                "uint8_col": np.random.randint(0, 100, size=n).astype(np.uint8),
+                "uint16_col": np.random.randint(0, 1000, size=n).astype(np.uint16),
+                "uint32_col": np.random.randint(0, 10000, size=n).astype(np.uint32),
+                "uint64_col": np.random.randint(0, 10000, size=n).astype(np.uint64),
+            }
+        )
+        assert targetviz_report(df, "target", output_dir=temp_dir + "/") is None
 
-    # Nullable UInt types (pandas extension types)
-    df_nullable = pd.DataFrame(
-        {
-            "target": list(range(1, 11)),
-            "uint8_col": pd.array([1, 2, 3, pd.NA, 5, 6, 7, 8, 9, 10], dtype="UInt8"),
-            "uint16_col": pd.array(
-                [100, 200, 300, pd.NA, 500, 600, 700, 800, 900, 1000], dtype="UInt16"
-            ),
-            "uint32_col": pd.array(
-                [1000, 2000, 3000, pd.NA, 5000, 6000, 7000, 8000, 9000, 10000], dtype="UInt32"
-            ),
-            "uint64_col": pd.array(
-                [10000, 20000, 30000, pd.NA, 50000, 60000, 70000, 80000, 90000, 100000],
-                dtype="UInt64",
-            ),
-        }
-    )
-    assert targetviz_report(df_nullable, "target") is None
+        # Nullable UInt types (pandas extension types)
+        df_nullable = pd.DataFrame(
+            {
+                "target": list(range(1, 11)),
+                "uint8_col": pd.array([1, 2, 3, pd.NA, 5, 6, 7, 8, 9, 10], dtype="UInt8"),
+                "uint16_col": pd.array(
+                    [100, 200, 300, pd.NA, 500, 600, 700, 800, 900, 1000], dtype="UInt16"
+                ),
+                "uint32_col": pd.array(
+                    [1000, 2000, 3000, pd.NA, 5000, 6000, 7000, 8000, 9000, 10000], dtype="UInt32"
+                ),
+                "uint64_col": pd.array(
+                    [10000, 20000, 30000, pd.NA, 50000, 60000, 70000, 80000, 90000, 100000],
+                    dtype="UInt64",
+                ),
+            }
+        )
+        assert targetviz_report(df_nullable, "target", output_dir=temp_dir + "/") is None
 
 
 def test_nullable_int_float_all_sizes():
     """Test all sizes of nullable Int and Float types."""
-    df = pd.DataFrame(
-        {
-            "target": list(range(1, 11)),
-            "int8_col": pd.array([1, 2, 3, pd.NA, 5, 6, 7, 8, 9, 10], dtype="Int8"),
-            "int16_col": pd.array(
-                [100, 200, 300, pd.NA, 500, 600, 700, 800, 900, 1000], dtype="Int16"
-            ),
-            "int32_col": pd.array(
-                [1000, 2000, 3000, pd.NA, 5000, 6000, 7000, 8000, 9000, 10000], dtype="Int32"
-            ),
-            "float32_col": pd.array(
-                [1.1, 2.2, 3.3, pd.NA, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0], dtype="Float32"
-            ),
-        }
-    )
-    assert targetviz_report(df, "target") is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        df = pd.DataFrame(
+            {
+                "target": list(range(1, 11)),
+                "int8_col": pd.array([1, 2, 3, pd.NA, 5, 6, 7, 8, 9, 10], dtype="Int8"),
+                "int16_col": pd.array(
+                    [100, 200, 300, pd.NA, 500, 600, 700, 800, 900, 1000], dtype="Int16"
+                ),
+                "int32_col": pd.array(
+                    [1000, 2000, 3000, pd.NA, 5000, 6000, 7000, 8000, 9000, 10000], dtype="Int32"
+                ),
+                "float32_col": pd.array(
+                    [1.1, 2.2, 3.3, pd.NA, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0], dtype="Float32"
+                ),
+            }
+        )
+        assert targetviz_report(df, "target", output_dir=temp_dir + "/") is None
 
 
 @pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow or ArrowDtype not available")
@@ -374,22 +387,23 @@ def test_pyarrow_numeric_types():
     """Test with pyarrow-backed numeric types."""
     import pyarrow as pa
 
-    df = pd.DataFrame(
-        {
-            "target": list(range(1, 11)),
-            "int_col": pd.array(
-                [1, 2, 3, None, 5, 6, 7, 8, 9, 10], dtype=pd.ArrowDtype(pa.int64())
-            ),
-            "float_col": pd.array(
-                [1.1, 2.2, 3.3, None, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0],
-                dtype=pd.ArrowDtype(pa.float64()),
-            ),
-            "uint_col": pd.array(
-                [1, 2, 3, None, 5, 6, 7, 8, 9, 10], dtype=pd.ArrowDtype(pa.uint32())
-            ),
-        }
-    )
-    assert targetviz_report(df, "target") is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        df = pd.DataFrame(
+            {
+                "target": list(range(1, 11)),
+                "int_col": pd.array(
+                    [1, 2, 3, None, 5, 6, 7, 8, 9, 10], dtype=pd.ArrowDtype(pa.int64())
+                ),
+                "float_col": pd.array(
+                    [1.1, 2.2, 3.3, None, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0],
+                    dtype=pd.ArrowDtype(pa.float64()),
+                ),
+                "uint_col": pd.array(
+                    [1, 2, 3, None, 5, 6, 7, 8, 9, 10], dtype=pd.ArrowDtype(pa.uint32())
+                ),
+            }
+        )
+        assert targetviz_report(df, "target", output_dir=temp_dir + "/") is None
 
 
 @pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow or ArrowDtype not available")
@@ -399,28 +413,32 @@ def test_pyarrow_string_type():
 
     np.random.seed(42)
     n = 50
-    df = pd.DataFrame(
-        {
-            "target": np.random.normal(10, size=n),
-            "str_col": pd.array(
-                ["cat_" + str(i % 5) for i in range(n)], dtype=pd.ArrowDtype(pa.string())
-            ),
-        }
-    )
-    assert targetviz_report(df, "target") is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        df = pd.DataFrame(
+            {
+                "target": np.random.normal(10, size=n),
+                "str_col": pd.array(
+                    ["cat_" + str(i % 5) for i in range(n)], dtype=pd.ArrowDtype(pa.string())
+                ),
+            }
+        )
+        assert targetviz_report(df, "target", output_dir=temp_dir + "/") is None
 
 
 def test_string_dtype():
     """Test with pandas StringDtype."""
     np.random.seed(42)
     n = 50
-    df = pd.DataFrame(
-        {
-            "target": np.random.normal(10, size=n),
-            "str_col": pd.array(["cat_" + str(i % 5) for i in range(n)], dtype=pd.StringDtype()),
-        }
-    )
-    assert targetviz_report(df, "target") is None
+    with tempfile.TemporaryDirectory() as temp_dir:
+        df = pd.DataFrame(
+            {
+                "target": np.random.normal(10, size=n),
+                "str_col": pd.array(
+                    ["cat_" + str(i % 5) for i in range(n)], dtype=pd.StringDtype()
+                ),
+            }
+        )
+        assert targetviz_report(df, "target", output_dir=temp_dir + "/") is None
 
 
 def test_pandas_future_string_inference():
@@ -443,4 +461,5 @@ def test_pandas_future_string_inference():
         )
         # Verify the string type was inferred (not object)
         assert df["str_col"].dtype != np.dtype("object")
-        assert targetviz_report(df, "target") is None
+        with tempfile.TemporaryDirectory() as temp_dir:
+            assert targetviz_report(df, "target", output_dir=temp_dir + "/") is None
