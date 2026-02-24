@@ -70,7 +70,9 @@ def get_std(series: pd.Series, desc_params: DescParams) -> Union[float, str]:
     if desc_params["is_cat"]:
         std = "-"
     elif desc_params["is_date"]:
-        std = formatter.format(series.sub(pd.Timestamp("2010-01-01")).dt.days.std())
+        # Use the series' own minimum as reference to avoid tz-naive/aware mismatch
+        ref = series.min()
+        std = formatter.format(series.sub(ref).dt.days.std())
     else:
         std = formatter.format(series.std())
     return std

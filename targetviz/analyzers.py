@@ -1,6 +1,8 @@
 """Analyzer classes for targetviz."""
 
 import logging
+from datetime import date as _date_type
+from datetime import datetime as _datetime_type
 from typing import Any, List, Literal, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -50,8 +52,10 @@ def _is_string_or_object_dtype(dtype) -> bool:
 def _is_datetime_dtype(dtype) -> bool:
     """Check if dtype is datetime-like.
 
-    Handles numpy datetime64, pandas DatetimeTZDtype, and pyarrow timestamps.
+    Handles numpy datetime64, pandas DatetimeTZDtype, and pyarrow timestamps/dates.
     """
+    if ptypes.is_datetime64_any_dtype(dtype):
+        return True
     try:
         if dtype.kind == "M":
             return True
@@ -67,6 +71,42 @@ def _is_datetime_dtype(dtype) -> bool:
         except ImportError:
             pass
     return False
+
+
+def _is_date_object_column(series: pd.Series) -> bool:
+    """Check if an object-dtype series actually contains date/datetime objects.
+
+    Samples up to 20 non-null values and checks their Python types.
+    """
+    if not ptypes.is_object_dtype(series.dtype):
+        return False
+    non_null = series.dropna()
+    if len(non_null) == 0:
+        return False
+    sample = non_null.head(min(20, len(non_null)))
+    return all(isinstance(v, (_date_type, _datetime_type)) for v in sample)
+
+
+def _coerce_to_datetime(series: pd.Series) -> pd.Series:
+    """Convert a date-like series to pandas datetime64.
+
+    Handles datetime.date objects, pyarrow date/timestamp types,
+    and other formats supported by pd.to_datetime.
+    Always returns a numpy-backed datetime64 series.
+    """
+    # For pyarrow-backed types, convert through Python objects first
+    # to avoid pyarrow timezone database issues and ensure numpy-backed result
+    if hasattr(pd, "ArrowDtype") and isinstance(series.dtype, pd.ArrowDtype):
+        try:
+            return pd.to_datetime(series.astype(object))
+        except (ValueError, TypeError, OverflowError):
+            return series
+    if ptypes.is_datetime64_any_dtype(series.dtype):
+        return series
+    try:
+        return pd.to_datetime(series)
+    except (ValueError, TypeError, OverflowError):
+        return series
 
 
 def _is_numeric_dtype(dtype) -> bool:
@@ -101,18 +141,28 @@ class BaseAnalyzer:
         if n_values < 2:
             self.type = "UNIQUE"
         elif n_values == 2:
-            self.type = "BINARY"
-            df_small[self.col] = df_small[self.col].astype("category")
+            dtype = df_small[self.col].dtype
+            if _is_datetime_dtype(dtype) or _is_date_object_column(df_small[self.col]):
+                self.type = "DATE"
+                df_small[self.col] = _coerce_to_datetime(df_small[self.col])
+            else:
+                self.type = "BINARY"
+                df_small[self.col] = df_small[self.col].astype("category")
         else:
             dtype = df_small[self.col].dtype
-            if _is_string_or_object_dtype(dtype):
+            if _is_datetime_dtype(dtype):
+                self.type = "DATE"
+                df_small[self.col] = _coerce_to_datetime(df_small[self.col])
+            elif _is_date_object_column(df_small[self.col]):
+                self.log.info(f"Coercing date column {self.col} from {dtype} to datetime")
+                df_small[self.col] = _coerce_to_datetime(df_small[self.col])
+                self.type = "DATE"
+            elif _is_string_or_object_dtype(dtype):
                 self.log.info(f"Coercing column {self.col} from {dtype} to category")
                 df_small[self.col] = df_small[self.col].astype("category")
                 self.type = "CAT"
             elif isinstance(dtype, pd.CategoricalDtype):
                 self.type = "CAT"
-            elif _is_datetime_dtype(dtype):
-                self.type = "DATE"
             elif _is_numeric_dtype(dtype):
                 self.type = "NUM"
             else:
@@ -314,10 +364,12 @@ class ColumnAnalyzer(BaseAnalyzer):
 
     def change_types(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Do some type changing before starting, object and string types are not allowed
+        Do some type changing before starting, object and string types are not allowed.
+        Date objects in object columns are left untouched for later detection.
         """
         if _is_string_or_object_dtype(data[self.col].dtype):
-            data[self.col] = data[self.col].astype("category")
+            if not _is_date_object_column(data[self.col]):
+                data[self.col] = data[self.col].astype("category")
         return data
 
     def run(self, data: pd.DataFrame, result_dict: ResultDict) -> ResultDict:
@@ -473,7 +525,7 @@ class ColumnAnalyzer(BaseAnalyzer):
             else:
                 if self.type == "DATE":
                     cut_col = pd.qcut(
-                        df_small[self.col].apply(lambda x: int(x.strftime("%Y%m%d"))),
+                        df_small[self.col].dt.strftime("%Y%m%d").astype(int),
                         n_breaks,
                         duplicates="drop",
                         precision=self.config.qcut_precision,
