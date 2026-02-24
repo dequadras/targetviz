@@ -1,254 +1,26 @@
-"""
-Module containing all functionality for the targetviz report
-"""
+"""Analyzer classes for targetviz."""
 
-import base64
 import logging
-import os
-import sys
-from collections.abc import Sequence
-from datetime import datetime
-from io import BytesIO
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypedDict, Union
-from urllib.parse import quote
+from typing import Any, List, Literal, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from jinja2 import Template
 
-from targetviz.config import config
-
-if sys.version_info >= (3, 10):
-    from importlib.resources import files
-else:
-    from importlib_resources import files
-
-# Define more specific types
-ConfigDict = Dict[str, Union[str, int, float, bool, List[Any], Dict[str, Any]]]
-ResultDict = Dict[str, Dict[str, Union[str, float, Dict[str, Any]]]]
-
-
-class DescParams(TypedDict):
-    full_samp: bool
-    is_cat: bool
-    is_date: bool
-    formatter: Callable[[Union[float, datetime]], str]
-
-
-def _get_template_path(fname: str) -> os.PathLike:
-    """
-    Returns the full path to a template file
-    """
-    return files("targetviz.templates").joinpath(fname)
-
-
-def create_log(timestamp: str, output_dir: str, log_name: Optional[str] = None) -> logging.Logger:
-    """
-    Create logger and formatters, and handlers
-    """
-    if log_name is None:
-        log_name = f"targetviz_analysis_{timestamp}.log"
-    log_format = "%(asctime)s %(levelname)-8s %(message)s"
-    date_format = "%Y-%m-%d %H:%M:%S"
-
-    logging.basicConfig(
-        format=log_format, level=os.environ.get("LOGLEVEL", "INFO"), datefmt=date_format
-    )
-
-    log = logging.getLogger("targetviz")
-
-    file_handler = logging.FileHandler(os.path.join(output_dir, log_name))
-
-    formatter = logging.Formatter(log_format, datefmt=date_format)
-    file_handler.setFormatter(formatter)
-    log.addHandler(file_handler)
-
-    return log
-
-
-def get_df_small(data: pd.DataFrame, col: str, target: str) -> pd.DataFrame:
-    """
-    Generate a smaller version of the dataframe with only the specific variable and the
-     target variable. This dataframe can be mutated
-    """
-    if col == target:
-        dfs = data.loc[:, [col]].copy()
-    else:
-        dfs = data.loc[:, [col, target]].copy()
-    return dfs
-
-
-def sort_cols_by_exp_var(result_dict: ResultDict, columns: List[str]) -> List[str]:
-    """
-    get columns by order according to explained variance
-    remove columns that are not analyzed
-    """
-    expl_var_list = []
-    used_cols = []
-    for col in columns:
-        if col in result_dict.keys():
-            expl_var_list.append(result_dict[col]["explained_var"])
-            used_cols.append(col)
-
-    order = [x for _, x in sorted(zip(expl_var_list, range(len(expl_var_list))))]
-    used_cols = [used_cols[ord_] for ord_ in reversed(order)]
-    return used_cols
-
-
-def plot_kde(series: pd.Series, ax: plt.Axes, config_: ConfigDict) -> None:
-    """
-    Plot kde with config_ parameters
-    """
-    max_sample = config_["kde"]["max_sample"].get(int)
-    ind = config_["kde"]["ind"].get(int)
-    if len(series) > max_sample:
-        series = series.sample(max_sample)
-    try:
-        series.plot.kde(ind=ind, ax=ax)
-    except np.linalg.LinAlgError:
-        print("not able to kde")
-
-
-def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -> None:
-    """
-    Create html file, populate and render file
-    """
-
-    # Create html file and render
-    base_html = _get_template_path("base.html")
-
-    # fill jinja template with data
-    with open(base_html, "r") as file:
-        template = Template(file.read())
-    extra_html = _get_template_path("extra_col.html")
-
-    used_cols = sort_cols_by_exp_var(result_dict, columns)
-    html = template.render(result_dict=result_dict, columns=columns)
-
-    with open(extra_html, "r") as file:
-        extra_template = Template(file.read())
-
-    for col in used_cols:
-        html_out = extra_template.render(result_dict=result_dict, column=col)
-        html += html_out
-
-    # write to file
-    with open(name_html, "w") as f:
-        f.write(html)
-
-
-def get_num_values(series: pd.Series) -> int:
-    """Get number of values in series"""
-    return len(series)
-
-
-def get_num_unique_values(series: pd.Series) -> int:
-    """Get number of unique values in series"""
-    return series.nunique()
-
-
-def get_num_missing(series: pd.Series, desc_params: DescParams) -> List[Union[int, str]]:
-    """Get number of missing values and percentage of total"""
-    if desc_params["full_samp"]:
-        n_nan = np.sum(series.isna())
-        list_missing = [n_nan, "{:.2f}%".format(n_nan / len(series))]
-    else:
-        list_missing = ["-"] * 2
-    return list_missing
-
-
-def get_min_max_mean(series: pd.Series, desc_params: DescParams) -> List[Union[float, str]]:
-    """Get min max and mean values of series"""
-    formatter = desc_params["formatter"]
-    if desc_params["is_cat"]:
-        list_min_max_mean = ["-"] * 3
-    else:
-        list_min_max_mean = [
-            formatter.format(series.max()),
-            formatter.format(series.min()),
-            formatter.format(series.mean()),
-        ]
-    return list_min_max_mean
-
-
-def get_median(series: pd.Series, desc_params: DescParams) -> Union[float, str]:
-    """Get median value from series"""
-    formatter = desc_params["formatter"]
-    if desc_params["is_cat"]:
-        median = "-"
-    elif desc_params["is_date"]:
-        median = formatter.format(series.quantile(0.5))
-    else:
-        median = formatter.format(series.median())
-    return median
-
-
-def get_mode(series: pd.Series, desc_params: DescParams) -> Union[float, str]:
-    """Get mode from series"""
-    formatter = desc_params["formatter"]
-    if desc_params["is_cat"]:
-        mode = series.mode()[0]
-    else:
-        mode = formatter.format(series.mode()[0])
-    return mode
-
-
-def get_std(series: pd.Series, desc_params: DescParams) -> Union[float, str]:
-    """Get standard deviation from series"""
-    formatter = desc_params["formatter"]
-    if desc_params["is_cat"]:
-        std = "-"
-    elif desc_params["is_date"]:
-        std = formatter.format(series.sub(pd.Timestamp("2010-01-01")).dt.days.std())
-    else:
-        std = formatter.format(series.std())
-    return std
-
-
-def get_quantiles(
-    series: pd.Series, desc_params: DescParams, quantiles: List[float]
-) -> List[Union[float, str]]:
-    """Get quantile values from series"""
-    formatter = desc_params["formatter"]
-    if desc_params["is_cat"]:
-        list_quantiles = ["-"] * len(quantiles)
-    else:
-        list_quantiles = [formatter.format(series.quantile(quantile)) for quantile in quantiles]
-    return list_quantiles
-
-
-def truncate_labels(ax, config: ConfigDict):
-    """
-    Truncate labels on the given axis to ensure they have at most a certain length.
-    """
-    max_lable_len = config["max_lable_len"].get(int)
-    # Truncate x-axis labels
-    xlabels = ax.get_xticks()
-    new_xlabels = []
-    for label in ax.get_xticklabels():
-        text = label.get_text()
-        if len(text) > max_lable_len:
-            truncated_text = text[: max_lable_len - 3] + "..."
-        else:
-            truncated_text = text
-        new_xlabels.append(truncated_text)
-    ax.set_xticks(xlabels)
-    ax.set_xticklabels(new_xlabels)
-
-    # Truncate y-axis labels
-    ylabels = ax.get_yticks()
-    new_ylabels = []
-    for label in ax.get_yticklabels():
-        text = label.get_text()
-        if len(text) > max_lable_len:
-            truncated_text = text[: max_lable_len - 3] + "..."
-        else:
-            truncated_text = text
-        new_ylabels.append(truncated_text)
-    ax.set_yticks(ylabels)
-    ax.set_yticklabels(new_ylabels)
+from targetviz.stats import (
+    get_median,
+    get_min_max_mean,
+    get_mode,
+    get_num_missing,
+    get_num_unique_values,
+    get_num_values,
+    get_quantiles,
+    get_std,
+)
+from targetviz.typedefs import ConfigDict, ResultDict
+from targetviz.utils import get_df_small, plot_360_n0sc0pe
+from targetviz.visualize import plot_kde, truncate_labels
 
 
 class BaseAnalyzer:
@@ -284,7 +56,7 @@ class BaseAnalyzer:
                 self.type = "DATE"
             elif type_ in ["category", "object"]:
                 self.type = "CAT"
-            elif type_.startswith(("float", "int", "Int", "Float")):
+            elif type_.startswith(("float", "int", "Int", "Float", "uint", "Uint")):
                 self.type = "NUM"
             else:
                 raise TypeError(f"cannot parse type {type_}")
@@ -716,104 +488,3 @@ class ColumnAnalyzer(BaseAnalyzer):
             return 0.0  # If variance is zero, there's no variation to explain
         else:
             return 1 - non_exp_variance / variance
-
-
-def set_default_params(
-    config_: ConfigDict, columns: Optional[List[str]], target: str, data: pd.DataFrame
-) -> Tuple[List[str], str]:
-    """
-    Set default parameters from config_ and set default columns to use
-    """
-    name_file_out = config_["name_file_out"].get(str)
-
-    if name_file_out == "default":
-        timestamp = config_["timestamp"].get(str)
-        name_file_out = "targetviz_report_{}.html".format(timestamp)
-
-    # if name does not end in .html append it
-    name_file_out = name_file_out if name_file_out.endswith(".html") else name_file_out + ".html"
-
-    if columns is None:
-        columns = list(set(data.columns).difference([target]))
-    else:
-        assert isinstance(columns, Sequence)
-
-    return columns, name_file_out
-
-
-def base64_image(image: bytes, mime_type: str) -> str:
-    """Encode the image for an URL using base64
-
-    Args:
-        image: the image
-        mime_type: the mime type
-
-    Returns:
-        A string starting with "data:{mime_type};base64,"
-    """
-    base64_data = base64.b64encode(image)
-    image_data = quote(base64_data)
-    return f"data:{mime_type};base64,{image_data}"
-
-
-def plot_360_n0sc0pe() -> str:
-    """Quickscope the plot to a base64 encoded string.
-
-    Returns:
-        A base64 encoded version of the plot in the specified image format.
-    """
-
-    image_bytes = BytesIO()
-    plt.savefig(
-        image_bytes,
-        format="png",
-    )
-    plt.close()
-    result_string = base64_image(image_bytes.getvalue(), "image/png")
-
-    return result_string
-
-
-def targetviz_report(
-    data: pd.DataFrame,
-    target: str,
-    columns: Optional[List[str]] = None,
-    output_dir: str = "./",
-    **kwargs: Any,
-) -> None:
-    """
-    This function generates a report with plots and statistics showing the relation
-    between a target variable and a set of other variables
-    :param data: DataFrame where all result_dict is located
-    :param target: name of the column to use as target
-    :param columns: list of names of the columns to use as dependent variables
-    :param output_dir: directory to output result
-    :return: No output is returns, instead an html file with all the info and plots is
-     generated
-    """
-    timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
-    config.__setitem__("timestamp", timestamp)
-
-    # Add the new default parameter
-    config.__setitem__("max_scatter_points", 1000)
-
-    config.set_kwargs(kwargs)
-    columns, name_file_out = set_default_params(config, columns, target, data)
-
-    log = create_log(timestamp, output_dir, log_name=name_file_out.replace(".html", ".log"))
-
-    result_dict: ResultDict = {"target": target}
-
-    target_analyzer = TargetAnalyzer(target, config, log)
-    data, target_histogram, target_table = target_analyzer.run(data)
-    result_dict["target_histogram"] = target_histogram
-    result_dict["target_table"] = target_table
-    config.__setitem__("target_type", target_analyzer.type)
-
-    total_cols: int = len(columns)
-    for i, col in enumerate(columns, start=1):
-        log.info(f"({i}/{total_cols}) Analyzing column: {col}")
-        col_analyzer = ColumnAnalyzer(col, target, config, log)
-        result_dict = col_analyzer.run(data, result_dict)
-
-    render_output(result_dict, columns, output_dir + name_file_out)

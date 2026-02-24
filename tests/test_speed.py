@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from targetviz.main import targetviz_report
+from targetviz.profile_report import targetviz_report
 
 SIZE = 1000000
 

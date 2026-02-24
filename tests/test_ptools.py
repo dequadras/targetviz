@@ -9,8 +9,9 @@ import numpy as np
 import pandas as pd
 from sklearn import datasets
 
+from targetviz.analyzers import BaseAnalyzer, ColumnAnalyzer
 from targetviz.config import config
-from targetviz.main import BaseAnalyzer, ColumnAnalyzer, targetviz_report
+from targetviz.profile_report import targetviz_report
 
 
 def sklearn_to_df(sklearn_dataset):
