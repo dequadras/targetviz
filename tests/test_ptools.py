@@ -7,11 +7,21 @@ from unittest.mock import MagicMock, Mock
 
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn import datasets
 
 from targetviz.analyzers import BaseAnalyzer, ColumnAnalyzer
 from targetviz.config import config
 from targetviz.profile_report import targetviz_report
+
+
+def _has_pyarrow():
+    try:
+        import pyarrow  # noqa: F401
+
+        return hasattr(pd, "ArrowDtype")
+    except ImportError:
+        return False
 
 
 def sklearn_to_df(sklearn_dataset):
@@ -300,3 +310,137 @@ def test_nullable_types():
         }
     )
     assert targetviz_report(df_mixed, "target") is None
+
+
+def test_uint_types():
+    """Test with unsigned integer types (numpy uint and nullable UInt)."""
+    np.random.seed(42)
+    n = 50
+
+    # numpy uint types
+    df = pd.DataFrame(
+        {
+            "target": np.random.normal(10, size=n),
+            "uint8_col": np.random.randint(0, 100, size=n).astype(np.uint8),
+            "uint16_col": np.random.randint(0, 1000, size=n).astype(np.uint16),
+            "uint32_col": np.random.randint(0, 10000, size=n).astype(np.uint32),
+            "uint64_col": np.random.randint(0, 10000, size=n).astype(np.uint64),
+        }
+    )
+    assert targetviz_report(df, "target") is None
+
+    # Nullable UInt types (pandas extension types)
+    df_nullable = pd.DataFrame(
+        {
+            "target": list(range(1, 11)),
+            "uint8_col": pd.array([1, 2, 3, pd.NA, 5, 6, 7, 8, 9, 10], dtype="UInt8"),
+            "uint16_col": pd.array(
+                [100, 200, 300, pd.NA, 500, 600, 700, 800, 900, 1000], dtype="UInt16"
+            ),
+            "uint32_col": pd.array(
+                [1000, 2000, 3000, pd.NA, 5000, 6000, 7000, 8000, 9000, 10000], dtype="UInt32"
+            ),
+            "uint64_col": pd.array(
+                [10000, 20000, 30000, pd.NA, 50000, 60000, 70000, 80000, 90000, 100000],
+                dtype="UInt64",
+            ),
+        }
+    )
+    assert targetviz_report(df_nullable, "target") is None
+
+
+def test_nullable_int_float_all_sizes():
+    """Test all sizes of nullable Int and Float types."""
+    df = pd.DataFrame(
+        {
+            "target": list(range(1, 11)),
+            "int8_col": pd.array([1, 2, 3, pd.NA, 5, 6, 7, 8, 9, 10], dtype="Int8"),
+            "int16_col": pd.array(
+                [100, 200, 300, pd.NA, 500, 600, 700, 800, 900, 1000], dtype="Int16"
+            ),
+            "int32_col": pd.array(
+                [1000, 2000, 3000, pd.NA, 5000, 6000, 7000, 8000, 9000, 10000], dtype="Int32"
+            ),
+            "float32_col": pd.array(
+                [1.1, 2.2, 3.3, pd.NA, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0], dtype="Float32"
+            ),
+        }
+    )
+    assert targetviz_report(df, "target") is None
+
+
+@pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow or ArrowDtype not available")
+def test_pyarrow_numeric_types():
+    """Test with pyarrow-backed numeric types."""
+    import pyarrow as pa
+
+    df = pd.DataFrame(
+        {
+            "target": list(range(1, 11)),
+            "int_col": pd.array(
+                [1, 2, 3, None, 5, 6, 7, 8, 9, 10], dtype=pd.ArrowDtype(pa.int64())
+            ),
+            "float_col": pd.array(
+                [1.1, 2.2, 3.3, None, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0],
+                dtype=pd.ArrowDtype(pa.float64()),
+            ),
+            "uint_col": pd.array(
+                [1, 2, 3, None, 5, 6, 7, 8, 9, 10], dtype=pd.ArrowDtype(pa.uint32())
+            ),
+        }
+    )
+    assert targetviz_report(df, "target") is None
+
+
+@pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow or ArrowDtype not available")
+def test_pyarrow_string_type():
+    """Test with pyarrow-backed string type."""
+    import pyarrow as pa
+
+    np.random.seed(42)
+    n = 50
+    df = pd.DataFrame(
+        {
+            "target": np.random.normal(10, size=n),
+            "str_col": pd.array(
+                ["cat_" + str(i % 5) for i in range(n)], dtype=pd.ArrowDtype(pa.string())
+            ),
+        }
+    )
+    assert targetviz_report(df, "target") is None
+
+
+def test_string_dtype():
+    """Test with pandas StringDtype."""
+    np.random.seed(42)
+    n = 50
+    df = pd.DataFrame(
+        {
+            "target": np.random.normal(10, size=n),
+            "str_col": pd.array(["cat_" + str(i % 5) for i in range(n)], dtype=pd.StringDtype()),
+        }
+    )
+    assert targetviz_report(df, "target") is None
+
+
+def test_pandas_future_string_inference():
+    """Test pandas 3 string inference mode (future.infer_string)."""
+    if not hasattr(pd, "options"):
+        pytest.skip("pd.options not available")
+    if not hasattr(pd.options, "future"):
+        pytest.skip("pd.options.future not available")
+    if not hasattr(pd.options.future, "infer_string"):
+        pytest.skip("future.infer_string not available in this pandas version")
+
+    with pd.option_context("future.infer_string", True):
+        np.random.seed(42)
+        n = 50
+        df = pd.DataFrame(
+            {
+                "target": np.random.normal(10, size=n),
+                "str_col": ["cat_" + str(i % 5) for i in range(n)],
+            }
+        )
+        # Verify the string type was inferred (not object)
+        assert df["str_col"].dtype != np.dtype("object")
+        assert targetviz_report(df, "target") is None

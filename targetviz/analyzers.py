@@ -6,6 +6,7 @@ from typing import Any, List, Literal, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pandas.api.types as ptypes
 import seaborn as sns
 
 from targetviz.stats import (
@@ -21,6 +22,61 @@ from targetviz.stats import (
 from targetviz.typedefs import ConfigDict, ResultDict
 from targetviz.utils import get_df_small, plot_360_n0sc0pe
 from targetviz.visualize import plot_kde, truncate_labels
+
+
+def _is_string_or_object_dtype(dtype) -> bool:
+    """Check if dtype represents string or object data.
+
+    Handles numpy object, pandas StringDtype (including pandas 3 default str type),
+    and pyarrow string/large_string.
+    """
+    if ptypes.is_object_dtype(dtype):
+        return True
+    if isinstance(dtype, pd.StringDtype):
+        return True
+    if hasattr(pd, "ArrowDtype") and isinstance(dtype, pd.ArrowDtype):
+        try:
+            import pyarrow as pa
+
+            return pa.types.is_string(dtype.pyarrow_dtype) or pa.types.is_large_string(
+                dtype.pyarrow_dtype
+            )
+        except ImportError:
+            pass
+    return False
+
+
+def _is_datetime_dtype(dtype) -> bool:
+    """Check if dtype is datetime-like.
+
+    Handles numpy datetime64, pandas DatetimeTZDtype, and pyarrow timestamps.
+    """
+    try:
+        if dtype.kind == "M":
+            return True
+    except (AttributeError, TypeError):
+        pass
+    if hasattr(pd, "ArrowDtype") and isinstance(dtype, pd.ArrowDtype):
+        try:
+            import pyarrow as pa
+
+            return pa.types.is_timestamp(dtype.pyarrow_dtype) or pa.types.is_date(
+                dtype.pyarrow_dtype
+            )
+        except ImportError:
+            pass
+    return False
+
+
+def _is_numeric_dtype(dtype) -> bool:
+    """Check if dtype is numeric (int, float, uint), excluding boolean.
+
+    Handles numpy dtypes, pandas nullable types (Int8-64, UInt8-64, Float32/64),
+    and pyarrow-backed numeric types.
+    """
+    if ptypes.is_bool_dtype(dtype):
+        return False
+    return ptypes.is_numeric_dtype(dtype)
 
 
 class BaseAnalyzer:
@@ -47,19 +103,19 @@ class BaseAnalyzer:
             self.type = "BINARY"
             df_small[self.col] = df_small[self.col].astype("category")
         else:
-            type_ = df_small[self.col].dtype.name
-            if type_ == "object":
-                self.log.info(f"Coercing column {self.col} from object to category")
+            dtype = df_small[self.col].dtype
+            if _is_string_or_object_dtype(dtype):
+                self.log.info(f"Coercing column {self.col} from {dtype} to category")
                 df_small[self.col] = df_small[self.col].astype("category")
-
-            if type_ in ["datetime64[ns]"]:
-                self.type = "DATE"
-            elif type_ in ["category", "object"]:
                 self.type = "CAT"
-            elif type_.startswith(("float", "int", "Int", "Float", "uint", "Uint")):
+            elif isinstance(dtype, pd.CategoricalDtype):
+                self.type = "CAT"
+            elif _is_datetime_dtype(dtype):
+                self.type = "DATE"
+            elif _is_numeric_dtype(dtype):
                 self.type = "NUM"
             else:
-                raise TypeError(f"cannot parse type {type_}")
+                raise TypeError(f"cannot parse type {dtype}")
         return df_small
 
     def create_desc_df(self, series: pd.Series, series_clean: pd.Series) -> pd.DataFrame:
@@ -226,7 +282,9 @@ class ColumnAnalyzer(BaseAnalyzer):
         """
         df_clean = df_small[~df_small[self.col].isna()]
         if self.type == "NUM":
-            df_clean = df_clean[np.isfinite(df_clean[self.col].values)]  # infinite removed
+            df_clean = df_clean[
+                np.isfinite(df_clean[self.col].to_numpy(dtype=float, na_value=np.nan))
+            ]  # infinite removed
             if self.config["pct_outliers"].get(float) > 0:
                 # remove outliers (only in numeric data)
                 df_clean = self.remove_outliers(df_clean)
@@ -240,8 +298,8 @@ class ColumnAnalyzer(BaseAnalyzer):
         percentile
         """
         pct_outliers = self.config["pct_outliers"].get(float)
-        limits = [pct_outliers * 100 / 2, 100 - pct_outliers * 100 / 2]
-        pct_val = list(np.percentile(data[self.col], limits))
+        limits = [pct_outliers / 2, 1 - pct_outliers / 2]
+        pct_val = [data[self.col].quantile(limits[0]), data[self.col].quantile(limits[1])]
         data = data[data[self.col] >= pct_val[0]]
         data = data[data[self.col] <= pct_val[1]]
         return data
@@ -257,10 +315,9 @@ class ColumnAnalyzer(BaseAnalyzer):
 
     def change_types(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Do some type changing before starting, object type is not allowed
+        Do some type changing before starting, object and string types are not allowed
         """
-        # change str to cat
-        if data[self.col].dtype.name == "object":
+        if _is_string_or_object_dtype(data[self.col].dtype):
             data[self.col] = data[self.col].astype("category")
         return data
 
