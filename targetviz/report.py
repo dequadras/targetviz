@@ -53,6 +53,9 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
         html_out = extra_template.render(result_dict=result_dict, column=col)
         html += html_out
 
+    # Close the wrapper div, body and html tags opened in base.html
+    html += "\n    </div>\n</body>\n</html>"
+
     # Check if output should be zipped
     if name_html.endswith(".html.zip"):
         # Create temporary HTML file
