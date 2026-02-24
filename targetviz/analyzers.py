@@ -9,6 +9,7 @@ import pandas as pd
 import pandas.api.types as ptypes
 import seaborn as sns
 
+from targetviz.config import Settings
 from targetviz.stats import (
     get_median,
     get_min_max_mean,
@@ -19,7 +20,7 @@ from targetviz.stats import (
     get_quantiles,
     get_std,
 )
-from targetviz.typedefs import ConfigDict, ResultDict
+from targetviz.typedefs import ResultDict
 from targetviz.utils import get_df_small, plot_360_n0sc0pe
 from targetviz.visualize import plot_kde, truncate_labels
 
@@ -84,8 +85,8 @@ class BaseAnalyzer:
     Base for analyzer classes TargetAnalyzer and ColumnAnalyzer
     """
 
-    def __init__(self, col: str, target: str, config_: ConfigDict, log: logging.Logger):
-        self.config: ConfigDict = config_
+    def __init__(self, col: str, target: str, config_: Settings, log: logging.Logger):
+        self.config: Settings = config_
         self.type: Optional[Literal["UNIQUE", "BINARY", "DATE", "CAT", "NUM"]] = None
         self.rate_non_nulls: Optional[float] = None
         self.target: str = target
@@ -125,7 +126,7 @@ class BaseAnalyzer:
         :param series_clean: pd.Series with no outliers or nan to describe
         :return: pd.DataFrame with table to show
         """
-        quantiles = self.config["quantiles"].get(list)
+        quantiles = self.config.quantiles
 
         list_fullsam = []
         list_fullsam.extend(self.get_desc(series, full_samp=True, quantiles=quantiles))
@@ -168,7 +169,7 @@ class BaseAnalyzer:
         desc = self.create_desc_df(series, series_clean)
 
         # Create figure for histogram only
-        fig, ax = plt.subplots(figsize=tuple(self.config["figures_size"].get(list)))
+        fig, ax = plt.subplots(figsize=tuple(self.config.figures_size))
 
         self.plot_histogram(series_clean, ax)
 
@@ -216,9 +217,7 @@ class BaseAnalyzer:
         Plot histogram of the column, with differences across types
         """
         if self.type in ["CAT", "BINARY"]:
-            series.value_counts().nlargest(self.config["hist"]["max_values"].get(int)).plot(
-                kind="bar", ax=ax
-            )
+            series.value_counts().nlargest(self.config.hist.max_values).plot(kind="bar", ax=ax)
         elif self.type == "DATE":
             from pandas.plotting import register_matplotlib_converters
 
@@ -241,7 +240,7 @@ class TargetAnalyzer(BaseAnalyzer):
     Class for analyzing target variable
     """
 
-    def __init__(self, target: str, config_: ConfigDict, log: logging.Logger):
+    def __init__(self, target: str, config_: Settings, log: logging.Logger):
         super().__init__(target, target, config_, log)
 
     def check_types(self, dfs: pd.DataFrame) -> None:
@@ -251,8 +250,8 @@ class TargetAnalyzer(BaseAnalyzer):
         if self.type not in ["BINARY", "CAT", "NUM"]:
             raise TypeError(f"{self.type} is not an allowed type for the target")
         if self.type == "CAT":
-            assert dfs[self.target].nunique() < self.config["max_target_class"].get(
-                int
+            assert (
+                dfs[self.target].nunique() < self.config.max_target_class
             ), f"Number of categories {dfs[self.target].nunique()} is too large"
 
     def run(self, data: pd.DataFrame) -> Tuple[pd.DataFrame, str, str]:
@@ -285,7 +284,7 @@ class ColumnAnalyzer(BaseAnalyzer):
             df_clean = df_clean[
                 np.isfinite(df_clean[self.col].to_numpy(dtype=float, na_value=np.nan))
             ]  # infinite removed
-            if self.config["pct_outliers"].get(float) > 0:
+            if self.config.pct_outliers > 0:
                 # remove outliers (only in numeric data)
                 df_clean = self.remove_outliers(df_clean)
         self.rate_non_nulls = df_clean.shape[0] / df_small.shape[0]
@@ -297,7 +296,7 @@ class ColumnAnalyzer(BaseAnalyzer):
         Only applicable for numeric data
         percentile
         """
-        pct_outliers = self.config["pct_outliers"].get(float)
+        pct_outliers = self.config.pct_outliers
         limits = [pct_outliers / 2, 1 - pct_outliers / 2]
         pct_val = [data[self.col].quantile(limits[0]), data[self.col].quantile(limits[1])]
         data = data[data[self.col] >= pct_val[0]]
@@ -345,7 +344,7 @@ class ColumnAnalyzer(BaseAnalyzer):
         explained_var = self.calc_explained_variance(df_clean, cut_series)
         result_dict[self.col]["explained_var"] = explained_var
 
-        fig = plt.figure(figsize=tuple(self.config["figures_size"].get(list)))
+        fig = plt.figure(figsize=tuple(self.config.figures_size))
         fig.suptitle("Relation between column {} and target".format(self.col), size=16)
 
         # Scatter for continuous and boxplot for category
@@ -365,7 +364,7 @@ class ColumnAnalyzer(BaseAnalyzer):
         """
         ax1 = plt.subplot2grid((2, 2), (0, 1))
         # add y label to ax1
-        target_type = self.config["target_type"].get(str)
+        target_type = self.config.target_type
         if target_type == "NUM":
             df_small[self.target].groupby(cut_col, observed=False).mean().plot(ax=ax1)
             truncate_labels(ax1, self.config)
@@ -376,7 +375,7 @@ class ColumnAnalyzer(BaseAnalyzer):
             for target_val in target_values:
                 if (target_val == 0) & (target_type == "BINARY"):
                     # for binary plot plot only one class
-                    if not self.config["plot_0_in_binary_target"].get(bool):
+                    if not self.config.plot_0_in_binary_target:
                         continue
                 (df_small[self.target] == target_val).groupby(cut_col, observed=False).mean().plot(
                     ax=ax1, marker="o"
@@ -399,9 +398,9 @@ class ColumnAnalyzer(BaseAnalyzer):
         Plot between column and target variable (scatter for numeric to numeric)
         """
         ax0 = plt.subplot2grid((2, 2), (0, 0), rowspan=2)
-        target_type: str = self.config["target_type"].get(str)
-        cmap: str = self.config["heatmap"]["cmap"].get(str)
-        max_scatter_points: int = self.config["max_scatter_points"].get(int)
+        target_type: str = self.config.target_type
+        cmap: str = self.config.heatmap.cmap
+        max_scatter_points: int = self.config.max_scatter_points
 
         if self.type in ["CAT", "BINARY", "DATE"]:
             if target_type == "NUM":
@@ -444,7 +443,7 @@ class ColumnAnalyzer(BaseAnalyzer):
         """
         Function to cut column into different buckets, for later analysis
         """
-        n_breaks = self.config["n_breaks"].get(int)
+        n_breaks = self.config.n_breaks
         if self.type in ["CAT", "BINARY"]:
             val_counts = df_small[self.col].value_counts().sort_values(ascending=False)
             if len(val_counts) > n_breaks:
@@ -477,7 +476,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                         df_small[self.col].apply(lambda x: int(x.strftime("%Y%m%d"))),
                         n_breaks,
                         duplicates="drop",
-                        precision=self.config["qcut_precision"].get(int),
+                        precision=self.config.qcut_precision,
                     ).cat.remove_unused_categories()
 
                 else:
@@ -485,7 +484,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                         df_small[self.col],
                         n_breaks,
                         duplicates="drop",
-                        precision=self.config["qcut_precision"].get(int),
+                        precision=self.config.qcut_precision,
                     ).cat.remove_unused_categories()
         if cut_col.nunique() == 1:
             warning_msg = (
@@ -503,7 +502,7 @@ class ColumnAnalyzer(BaseAnalyzer):
         """
         assert cut_series.isna().sum() == 0
         assert data.shape[0] == cut_series.shape[0]
-        target_type = self.config["target_type"].get(str)
+        target_type = self.config.target_type
         series_target = data[self.target]
         if target_type == "NUM":
             return self.calc_explained_variance_num(series_target, cut_series)

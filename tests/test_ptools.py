@@ -173,7 +173,7 @@ def test_calc_explained_var():
     new_col = pd.qcut(df_cal[col], n_breaks, duplicates="drop").cat.remove_unused_categories()
 
     config_ = config
-    config_.__setitem__("target_type", "NUM")
+    config_.target_type = "NUM"
     col_analysis = ColumnAnalyzer(Mock, target_col, config_, Mock)
     col_analysis.rate_non_nulls = 1
     np.testing.assert_almost_equal(

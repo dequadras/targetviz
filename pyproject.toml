@@ -19,12 +19,12 @@ classifiers = [
 ]
 keywords = ["targetviz", "data analysis", "data visualization", "data science"]
 dependencies = [
-    "confuse",
     'importlib-resources; python_version < "3.10"',
     "jinja2",
     "matplotlib>3.3",
     "numpy>1.22",
     "pandas>1.2",
+    "pyyaml",
     "scikit-learn>1.0",
     "seaborn>0.11",
 ]

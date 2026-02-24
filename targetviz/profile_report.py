@@ -30,7 +30,7 @@ def targetviz_report(
      generated
     """
     timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
-    config.__setitem__("timestamp", timestamp)
+    config.timestamp = timestamp
 
     # Apply kwargs which will override any defaults
     config.set_kwargs(kwargs)
@@ -45,7 +45,7 @@ def targetviz_report(
     data, target_histogram, target_table = target_analyzer.run(data)
     result_dict["target_histogram"] = target_histogram
     result_dict["target_table"] = target_table
-    config.__setitem__("target_type", target_analyzer.type)
+    config.target_type = target_analyzer.type
 
     total_cols: int = len(columns)
     for i, col in enumerate(columns, start=1):

@@ -8,7 +8,8 @@ from typing import List, Optional, Tuple
 import pandas as pd
 from jinja2 import Template
 
-from targetviz.typedefs import ConfigDict, ResultDict
+from targetviz.config import Settings
+from targetviz.typedefs import ResultDict
 from targetviz.utils import _get_template_path
 
 
@@ -77,15 +78,15 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
 
 
 def set_default_params(
-    config_: ConfigDict, columns: Optional[List[str]], target: str, data: pd.DataFrame
+    config_: Settings, columns: Optional[List[str]], target: str, data: pd.DataFrame
 ) -> Tuple[List[str], str]:
     """
     Set default parameters from config_ and set default columns to use
     """
-    name_file_out = config_["name_file_out"].get(str)
+    name_file_out = config_.name_file_out
 
     if name_file_out == "default":
-        timestamp = config_["timestamp"].get(str)
+        timestamp = config_.timestamp
         name_file_out = "targetviz_report_{}.html".format(timestamp)
 
     # Check if file should end with html or html.zip

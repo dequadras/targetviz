@@ -1,9 +1,9 @@
 """Type definitions for targetviz."""
 
 from datetime import datetime
-from typing import Any, Callable, Dict, List, TypedDict, Union
+from typing import Any, Callable, Dict, TypedDict, Union
 
-ConfigDict = Dict[str, Union[str, int, float, bool, List[Any], Dict[str, Any]]]
+ConfigDict = Any  # Kept for backward compatibility; prefer using Settings directly
 ResultDict = Dict[str, Dict[str, Union[str, float, Dict[str, Any]]]]
 
 

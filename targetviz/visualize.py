@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from targetviz.typedefs import ConfigDict
+from targetviz.config import Settings
 
 
-def plot_kde(series: pd.Series, ax: plt.Axes, config_: ConfigDict) -> None:
+def plot_kde(series: pd.Series, ax: plt.Axes, config_: Settings) -> None:
     """
     Plot kde with config_ parameters
     """
-    max_sample = config_["kde"]["max_sample"].get(int)
-    ind = config_["kde"]["ind"].get(int)
+    max_sample = config_.kde.max_sample
+    ind = config_.kde.ind
     if len(series) > max_sample:
         series = series.sample(max_sample)
     try:
@@ -21,11 +21,11 @@ def plot_kde(series: pd.Series, ax: plt.Axes, config_: ConfigDict) -> None:
         print("not able to kde")
 
 
-def truncate_labels(ax, config: ConfigDict):
+def truncate_labels(ax, config: Settings):
     """
     Truncate labels on the given axis to ensure they have at most a certain length.
     """
-    max_lable_len = config["max_lable_len"].get(int)
+    max_lable_len = config.max_lable_len
     # Truncate x-axis labels
     xlabels = ax.get_xticks()
     new_xlabels = []
