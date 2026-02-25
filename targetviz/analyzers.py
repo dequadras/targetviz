@@ -27,6 +27,46 @@ from targetviz.utils import get_df_small, plot_360_n0sc0pe
 from targetviz.visualize import plot_kde, truncate_labels
 
 
+def _clean_fp_noise(x: float) -> float:
+    """Remove floating-point representation noise from a number.
+
+    Tries progressively fewer decimal places (0 → 10) and returns the first
+    rounded value that is within a tiny relative tolerance of the original.
+    This turns artefacts like ``185.19899999999998`` into ``185.199`` while
+    preserving genuinely meaningful precision (e.g. ``1.23456`` stays as-is).
+    """
+    if x == 0 or not np.isfinite(x):
+        return x
+    for d in range(0, 11):
+        r = round(x, d)
+        if r == 0 and x != 0:
+            continue
+        if abs(r - x) <= 1e-9 * max(abs(x), 1):
+            return r
+    return x
+
+
+def _clean_interval_categories(cut_series: pd.Series) -> pd.Series:
+    """Clean floating-point noise from Interval category labels.
+
+    After ``pd.qcut``, interval edges can carry floating-point artefacts
+    (e.g. ``185.19899999999998`` instead of ``185.199``).  This function
+    renames the categories with cleaned-up edges while preserving the
+    actual bin assignments.
+    """
+    cats = cut_series.cat.categories
+    if not isinstance(cats, pd.IntervalIndex):
+        return cut_series
+    new_intervals = pd.IntervalIndex.from_arrays(
+        [_clean_fp_noise(x) for x in cats.left],
+        [_clean_fp_noise(x) for x in cats.right],
+        closed=cats.closed,
+    )
+    if new_intervals.equals(cats):
+        return cut_series
+    return cut_series.cat.rename_categories(new_intervals)
+
+
 def _is_string_or_object_dtype(dtype) -> bool:
     """Check if dtype represents string or object data.
 
@@ -534,6 +574,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                         duplicates="drop",
                         precision=self.config.qcut_precision,
                     ).cat.remove_unused_categories()
+                    cut_col = _clean_interval_categories(cut_col)
 
                 else:
                     cut_col = pd.qcut(
@@ -542,6 +583,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                         duplicates="drop",
                         precision=self.config.qcut_precision,
                     ).cat.remove_unused_categories()
+                    cut_col = _clean_interval_categories(cut_col)
         if cut_col.nunique() == 1:
             warning_msg = (
                 f"Column {self.col} has only one bucket. This can be caused\n"

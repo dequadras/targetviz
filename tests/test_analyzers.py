@@ -13,6 +13,8 @@ from targetviz.analyzers import (  # noqa: E402
     BaseAnalyzer,
     ColumnAnalyzer,
     TargetAnalyzer,
+    _clean_fp_noise,
+    _clean_interval_categories,
     _coerce_to_datetime,
     _is_date_object_column,
     _is_datetime_dtype,
@@ -189,6 +191,71 @@ class TestIsNumericDtype:
 
     def test_nullable_bool_excluded(self):
         assert _is_numeric_dtype(pd.BooleanDtype()) is False
+
+
+# ===================================================================
+# Floating-point noise cleanup helpers
+# ===================================================================
+
+
+class TestCleanFpNoise:
+    """Tests for _clean_fp_noise."""
+
+    def test_removes_trailing_nines_artefact(self):
+        # Classic FP noise: 185.19899999999998 should become 185.199
+        assert _clean_fp_noise(185.19899999999998) == 185.199
+
+    def test_removes_trailing_zeros_artefact(self):
+        assert _clean_fp_noise(384.7200000000001) == 384.72
+
+    def test_preserves_meaningful_precision(self):
+        # A value that genuinely needs 5 decimal places
+        assert _clean_fp_noise(1.23456) == 1.23456
+
+    def test_zero(self):
+        assert _clean_fp_noise(0.0) == 0.0
+
+    def test_negative(self):
+        assert _clean_fp_noise(-185.19899999999998) == -185.199
+
+    def test_integer_like_float(self):
+        assert _clean_fp_noise(100.0) == 100.0
+
+    def test_inf_unchanged(self):
+        assert _clean_fp_noise(float("inf")) == float("inf")
+
+    def test_nan_unchanged(self):
+        import math
+
+        assert math.isnan(_clean_fp_noise(float("nan")))
+
+    def test_small_number(self):
+        # 0.001 should stay as 0.001
+        assert _clean_fp_noise(0.001) == 0.001
+
+
+class TestCleanIntervalCategories:
+    """Tests for _clean_interval_categories."""
+
+    def test_cleans_interval_edges(self):
+        # Simulate what pd.qcut would produce with FP noise
+        idx = pd.IntervalIndex.from_breaks([185.19899999999998, 384.72, 600.0], closed="right")
+        s = pd.Categorical.from_codes([0, 1, 0, 1], categories=idx)
+        s = pd.Series(s)
+        result = _clean_interval_categories(s)
+        left_vals = [iv.left for iv in result.cat.categories]
+        assert left_vals[0] == 185.199
+
+    def test_non_interval_categories_unchanged(self):
+        s = pd.Series(pd.Categorical(["a", "b", "a"]))
+        result = _clean_interval_categories(s)
+        assert list(result.cat.categories) == ["a", "b"]
+
+    def test_already_clean_intervals_unchanged(self):
+        idx = pd.IntervalIndex.from_breaks([0.0, 1.0, 2.0], closed="right")
+        s = pd.Series(pd.Categorical.from_codes([0, 1, 0], categories=idx))
+        result = _clean_interval_categories(s)
+        assert result.cat.categories.equals(idx)
 
 
 # ===================================================================
