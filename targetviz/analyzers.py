@@ -408,6 +408,10 @@ class ColumnAnalyzer(BaseAnalyzer):
         rel_fig = plot_360_n0sc0pe()
         result_dict[self.col]["rel_fig"] = rel_fig
 
+        # Compute expected target values for null/not-null and outlier/not-outlier
+        target_stats_html = self.compute_target_expected_values(df_small)
+        result_dict[self.col]["target_stats"] = target_stats_html
+
         return result_dict
 
     def plot_cut_var_target_relation(self, df_small: pd.DataFrame, cut_col: pd.Series) -> None:
@@ -545,6 +549,77 @@ class ColumnAnalyzer(BaseAnalyzer):
             )
             self.log.warning(warning_msg)
         return cut_col
+
+    def _format_expected_value(self, target_series: pd.Series) -> str:
+        """Format expected value of target series based on target type."""
+        target_type = self.config.target_type
+        if target_type == "NUM":
+            return f"{target_series.mean():.4f}"
+        else:
+            # BINARY or CAT
+            vc = target_series.value_counts(normalize=True).sort_index()
+            parts = [f"P({v})={r:.2%}" for v, r in vc.items()]
+            return ", ".join(parts)
+
+    def compute_target_expected_values(self, df_small: pd.DataFrame) -> str:
+        """Compute expected value of target for null/not-null and outlier/not-outlier groups.
+
+        Returns an HTML string with the stats.
+        """
+        stats_parts = []
+
+        # --- Null vs not-null ---
+        null_mask = df_small[self.col].isna()
+        null_count = int(null_mask.sum())
+        not_null_count = int((~null_mask).sum())
+
+        if null_count > 0 and not_null_count > 0:
+            ev_null = self._format_expected_value(df_small.loc[null_mask, self.target])
+            ev_not_null = self._format_expected_value(df_small.loc[~null_mask, self.target])
+            stats_parts.append(
+                f"<b>E[{self.target} | {self.col} is null]</b> = {ev_null} &nbsp;(n={null_count})"
+            )
+            stats_parts.append(
+                f"<b>E[{self.target} | {self.col} is not null]</b> = {ev_not_null} "
+                f"&nbsp;(n={not_null_count})"
+            )
+        elif null_count == 0:
+            stats_parts.append(f"<i>No null values in {self.col}</i>")
+
+        # --- Outlier vs not-outlier (numeric predictors only) ---
+        if self.type == "NUM" and self.config.pct_outliers > 0:
+            pct_outliers = self.config.pct_outliers
+            limits = [pct_outliers / 2, 1 - pct_outliers / 2]
+            non_null = df_small.loc[~null_mask].copy()
+            non_null = non_null[
+                np.isfinite(non_null[self.col].to_numpy(dtype=float, na_value=np.nan))
+            ]
+            if non_null.shape[0] > 0:
+                lower = non_null[self.col].quantile(limits[0])
+                upper = non_null[self.col].quantile(limits[1])
+                outlier_mask = (non_null[self.col] < lower) | (non_null[self.col] > upper)
+                outlier_count = int(outlier_mask.sum())
+                not_outlier_count = int((~outlier_mask).sum())
+
+                if outlier_count > 0 and not_outlier_count > 0:
+                    ev_outlier = self._format_expected_value(
+                        non_null.loc[outlier_mask, self.target]
+                    )
+                    ev_not_outlier = self._format_expected_value(
+                        non_null.loc[~outlier_mask, self.target]
+                    )
+                    stats_parts.append(
+                        f"<b>E[{self.target} | {self.col} is outlier]</b> = {ev_outlier} "
+                        f"&nbsp;(n={outlier_count})"
+                    )
+                    stats_parts.append(
+                        f"<b>E[{self.target} | {self.col} is not outlier]</b> = {ev_not_outlier} "
+                        f"&nbsp;(n={not_outlier_count})"
+                    )
+                else:
+                    stats_parts.append(f"<i>No outliers detected in {self.col}</i>")
+
+        return "<br>".join(stats_parts)
 
     def calc_explained_variance(self, data: pd.DataFrame, cut_series: pd.Series) -> float:
         """

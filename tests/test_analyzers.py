@@ -609,3 +609,334 @@ class TestGetDesc:
         # missing count/pct should be "-"
         assert result[2] == "-"
         assert result[3] == "-"
+
+
+# ===================================================================
+# ColumnAnalyzer._format_expected_value
+# ===================================================================
+
+
+class TestFormatExpectedValue:
+    """Tests for _format_expected_value helper."""
+
+    def test_numeric_target(self):
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.config.target_type = "NUM"
+        result = ca._format_expected_value(pd.Series([10.0, 20.0, 30.0]))
+        assert result == "20.0000"
+
+    def test_binary_target(self):
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.config.target_type = "BINARY"
+        result = ca._format_expected_value(pd.Series([0, 1, 1, 1]))
+        assert "P(0)=25.00%" in result
+        assert "P(1)=75.00%" in result
+
+    def test_cat_target(self):
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.config.target_type = "CAT"
+        result = ca._format_expected_value(pd.Series(["a", "b", "b", "c"]))
+        assert "P(a)=25.00%" in result
+        assert "P(b)=50.00%" in result
+        assert "P(c)=25.00%" in result
+
+    def test_cat_target_with_categorical_dtype(self):
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.config.target_type = "CAT"
+        s = pd.Series(pd.Categorical(["x", "y", "x", "y", "y"]))
+        result = ca._format_expected_value(s)
+        assert "P(x)=40.00%" in result
+        assert "P(y)=60.00%" in result
+
+    def test_single_value_numeric(self):
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.config.target_type = "NUM"
+        result = ca._format_expected_value(pd.Series([5.0]))
+        assert result == "5.0000"
+
+    def test_single_class_cat(self):
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.config.target_type = "CAT"
+        result = ca._format_expected_value(pd.Series(["only"]))
+        assert "P(only)=100.00%" in result
+
+
+# ===================================================================
+# ColumnAnalyzer.compute_target_expected_values
+# ===================================================================
+
+
+class TestComputeTargetExpectedValues:
+    """Tests for compute_target_expected_values."""
+
+    # --- Numeric target, numeric predictor ---
+
+    def test_num_target_num_predictor_with_nulls_and_outliers(self):
+        """Null/not-null and outlier/not-outlier stats present for NUM predictor."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "NUM"
+        ca.config.pct_outliers = 0.05
+
+        np.random.seed(0)
+        col_vals = np.random.normal(50, 10, 200).tolist()
+        target_vals = np.random.normal(100, 20, 200).tolist()
+        # inject nulls
+        col_vals[0] = np.nan
+        col_vals[1] = np.nan
+        col_vals[2] = np.nan
+        df = pd.DataFrame({"col": col_vals, "target": target_vals})
+
+        html = ca.compute_target_expected_values(df)
+        assert "col is null" in html
+        assert "col is not null" in html
+        assert "col is outlier" in html
+        assert "col is not outlier" in html
+        assert "(n=3)" in html  # 3 nulls
+
+    def test_num_target_no_nulls(self):
+        """When no nulls exist, show 'No null values' message."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "NUM"
+        ca.config.pct_outliers = 0.05
+
+        df = pd.DataFrame({"col": [1.0, 2.0, 3.0, 4.0, 5.0], "target": [10, 20, 30, 40, 50]})
+        html = ca.compute_target_expected_values(df)
+        assert "No null values" in html
+
+    def test_no_outlier_section_for_cat_predictor(self):
+        """Outlier analysis should NOT appear for categorical predictors."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "CAT"
+        ca.config.target_type = "NUM"
+        ca.config.pct_outliers = 0.05
+
+        df = pd.DataFrame(
+            {
+                "col": pd.Categorical(["a", "b", "a", "b", np.nan]),
+                "target": [10, 20, 30, 40, 50],
+            }
+        )
+        html = ca.compute_target_expected_values(df)
+        assert "col is null" in html
+        assert "col is not null" in html
+        assert "outlier" not in html
+
+    def test_no_outlier_section_for_binary_predictor(self):
+        """Outlier analysis should NOT appear for binary predictors."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "BINARY"
+        ca.config.target_type = "NUM"
+        ca.config.pct_outliers = 0.05
+
+        df = pd.DataFrame(
+            {
+                "col": pd.Categorical([0, 1, 0, 1, np.nan]),
+                "target": [10, 20, 30, 40, 50],
+            }
+        )
+        html = ca.compute_target_expected_values(df)
+        assert "col is null" in html
+        assert "outlier" not in html
+
+    # --- Binary target ---
+
+    def test_binary_target_num_predictor(self):
+        """Binary target should show class probabilities."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "BINARY"
+        ca.config.pct_outliers = 0.05
+
+        np.random.seed(1)
+        n = 100
+        col_vals = np.random.normal(0, 1, n).tolist()
+        col_vals[0] = np.nan
+        col_vals[1] = np.nan
+        target_vals = np.random.choice([0, 1], size=n).tolist()
+        df = pd.DataFrame({"col": col_vals, "target": target_vals})
+
+        html = ca.compute_target_expected_values(df)
+        assert "P(" in html
+        assert "col is null" in html
+        assert "col is not null" in html
+        assert "col is outlier" in html
+        assert "col is not outlier" in html
+
+    def test_binary_target_cat_predictor(self):
+        """Binary target + cat predictor: null/not-null but no outlier."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "CAT"
+        ca.config.target_type = "BINARY"
+        ca.config.pct_outliers = 0.05
+
+        df = pd.DataFrame(
+            {
+                "col": pd.Categorical(["a", "b", "a", np.nan, "b"]),
+                "target": [0, 1, 0, 1, 1],
+            }
+        )
+        html = ca.compute_target_expected_values(df)
+        assert "P(" in html
+        assert "col is null" in html
+        assert "col is not null" in html
+        assert "outlier" not in html
+
+    # --- Categorical target ---
+
+    def test_cat_target_num_predictor(self):
+        """CAT target should show per-class probabilities."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "CAT"
+        ca.config.pct_outliers = 0.05
+
+        np.random.seed(2)
+        n = 100
+        col_vals = np.random.normal(0, 1, n).tolist()
+        col_vals[0] = np.nan
+        target_vals = np.random.choice(["low", "mid", "high"], size=n).tolist()
+        df = pd.DataFrame({"col": col_vals, "target": target_vals})
+
+        html = ca.compute_target_expected_values(df)
+        assert "P(" in html
+        assert "col is null" in html
+        assert "col is outlier" in html
+
+    def test_cat_target_cat_predictor(self):
+        """CAT target + CAT predictor: null/not-null, no outlier."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "CAT"
+        ca.config.target_type = "CAT"
+        ca.config.pct_outliers = 0.05
+
+        df = pd.DataFrame(
+            {
+                "col": pd.Categorical(["x", "y", np.nan, "x", "y", "x"]),
+                "target": pd.Categorical(["a", "b", "a", "b", "a", "b"]),
+            }
+        )
+        html = ca.compute_target_expected_values(df)
+        assert "P(" in html
+        assert "col is null" in html
+        assert "col is not null" in html
+        assert "outlier" not in html
+
+    def test_cat_target_cat_predictor_no_nulls(self):
+        """CAT target + CAT predictor with no nulls."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "CAT"
+        ca.config.target_type = "CAT"
+        ca.config.pct_outliers = 0.05
+
+        df = pd.DataFrame(
+            {
+                "col": pd.Categorical(["x", "y", "x", "y"]),
+                "target": pd.Categorical(["a", "b", "a", "b"]),
+            }
+        )
+        html = ca.compute_target_expected_values(df)
+        assert "No null values" in html
+        assert "outlier" not in html
+
+    # --- Edge cases ---
+
+    def test_all_null_predictor(self):
+        """When all predictor values are null, no null/not-null comparison possible."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "NUM"
+        ca.config.pct_outliers = 0.05
+
+        df = pd.DataFrame({"col": [np.nan, np.nan, np.nan], "target": [1, 2, 3]})
+        html = ca.compute_target_expected_values(df)
+        # All null → null_count > 0 but not_null_count == 0 → no null section
+        assert "is null" not in html or "No null" in html
+
+    def test_pct_outliers_zero_skips_outlier_section(self):
+        """When pct_outliers=0, outlier analysis should be skipped."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "NUM"
+        ca.config.pct_outliers = 0
+
+        df = pd.DataFrame({"col": [1.0, 2.0, 3.0], "target": [10, 20, 30]})
+        html = ca.compute_target_expected_values(df)
+        assert "outlier" not in html
+
+    def test_expected_value_correctness_numeric(self):
+        """Check the actual numeric values are computed correctly."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "NUM"
+        ca.config.pct_outliers = 0
+
+        df = pd.DataFrame(
+            {
+                "col": [np.nan, np.nan, 1.0, 2.0],
+                "target": [100.0, 200.0, 10.0, 20.0],
+            }
+        )
+        html = ca.compute_target_expected_values(df)
+        # E[target | col is null] = mean(100, 200) = 150.0
+        assert "150.0000" in html
+        # E[target | col is not null] = mean(10, 20) = 15.0
+        assert "15.0000" in html
+
+    def test_expected_value_correctness_binary_target(self):
+        """Check class probabilities for binary target."""
+        config_ = _make_config()
+        log = _make_log()
+        ca = ColumnAnalyzer("col", "target", config_, log)
+        ca.type = "NUM"
+        ca.config.target_type = "BINARY"
+        ca.config.pct_outliers = 0
+
+        df = pd.DataFrame(
+            {
+                "col": [np.nan, np.nan, 1.0, 2.0],
+                "target": [0, 1, 1, 1],
+            }
+        )
+        html = ca.compute_target_expected_values(df)
+        # null group: [0, 1] → P(0)=50%, P(1)=50%
+        assert "50.00%" in html
+        # not-null group: [1, 1] → P(1)=100%
+        assert "100.00%" in html

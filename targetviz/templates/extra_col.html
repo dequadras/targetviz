@@ -14,3 +14,9 @@
 <div class="rel-fig-container">
     {{ result_dict[column]['rel_fig'] | safe }}
 </div>
+
+{% if result_dict[column]['target_stats'] %}
+<div class="target-stats" style="margin-top: 10px; margin-bottom: 20px; padding: 10px; background-color: #f9f9f9; border-left: 3px solid #4CAF50; font-size: 0.95em;">
+    <p style="margin: 0;">{{ result_dict[column]['target_stats'] | safe }}</p>
+</div>
+{% endif %}
