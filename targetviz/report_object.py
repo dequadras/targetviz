@@ -31,7 +31,7 @@ class TargetVizReport:
         return (
             '<iframe width="100%" frameborder="0" '
             f'srcdoc="{escaped}" '
-            'style="height: 80vh; border: 1px solid #ddd; border-radius: 4px;">'
+            'style="height: 600px; border: 1px solid #ddd; border-radius: 4px;">'
             "</iframe>"
         )
 
