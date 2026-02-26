@@ -44,7 +44,20 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
     extra_html = _get_template_path("extra_col.html")
 
     used_cols = sort_cols_by_exp_var(result_dict, columns)
-    html = template.render(result_dict=result_dict, columns=columns)
+    skipped_variables = result_dict.get("skipped_variables", [])
+
+    # Build TOC data: list of (column_name, explained_var) sorted by importance
+    toc_entries = []
+    for col in used_cols:
+        ev = result_dict[col].get("explained_var", 0)
+        toc_entries.append({"name": col, "explained_var": ev})
+
+    html = template.render(
+        result_dict=result_dict,
+        columns=columns,
+        skipped_variables=skipped_variables,
+        toc_entries=toc_entries,
+    )
 
     # Use UTF-8 encoding when reading template files
     with open(extra_html, "r", encoding="utf-8") as file:

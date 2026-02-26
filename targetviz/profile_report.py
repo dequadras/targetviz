@@ -39,7 +39,7 @@ def targetviz_report(
 
     log = create_log()
 
-    result_dict: ResultDict = {"target": target}
+    result_dict: ResultDict = {"target": target, "skipped_variables": []}
 
     target_analyzer = TargetAnalyzer(target, config, log)
     data, target_histogram, target_table = target_analyzer.run(data)

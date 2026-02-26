@@ -417,11 +417,18 @@ class ColumnAnalyzer(BaseAnalyzer):
         Main function for running the column analysis
         """
         if not self.sanity_checks(data):
+            result_dict.setdefault("skipped_variables", []).append(
+                {"name": self.col, "reason": "All values are missing (no non-null values)"}
+            )
+            self.log.warning(f"Skipping column {self.col}: all values are missing")
             return result_dict
         df_small = get_df_small(data, self.col, self.target)
         df_small = self.change_types(df_small)
         df_small = self.get_type(df_small)
         if self.type == "UNIQUE":
+            result_dict.setdefault("skipped_variables", []).append(
+                {"name": self.col, "reason": "Constant (only one unique value)"}
+            )
             self.log.warning(f"Skipping column {self.col} with only one value")
             return result_dict
 

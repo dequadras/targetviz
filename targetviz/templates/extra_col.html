@@ -1,5 +1,5 @@
 <h2>----------------</h2>
-<h2>Column: {{ column }}</h2>
+<h2 id="var-{{ column | replace(' ', '-') | replace('.', '-') }}">Column: {{ column }}</h2>
 <p>Explained Variance: {{ "{:.2f}%".format(result_dict[column]['explained_var'] * 100) }}</p>
 
 <div class="flex-container">

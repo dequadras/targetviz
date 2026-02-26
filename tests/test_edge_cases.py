@@ -262,3 +262,109 @@ class TestKwargsPassthrough:
                 hist={"max_values": 5},
             )
             assert os.path.exists(os.path.join(tmpdir, "test.html"))
+
+
+class TestSkippedVariablesSummary:
+    """Tests for the skipped-variables banner in the generated HTML report."""
+
+    def test_skipped_constant_column_appears_in_report(self):
+        """A constant column should be listed as skipped with correct reason."""
+        df = pd.DataFrame(
+            {
+                "target": [0, 1, 0, 1, 0, 1],
+                "const_col": [7, 7, 7, 7, 7, 7],
+                "good_col": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            targetviz_report(
+                df, target="target", output_dir=tmpdir + os.sep, name_file_out="test.html"
+            )
+            html_path = os.path.join(tmpdir, "test.html")
+            with open(html_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            assert "1 variable skipped" in html
+            assert "const_col" in html
+            assert "Constant" in html
+
+    def test_skipped_all_null_column_appears_in_report(self):
+        """An all-null column should be listed as skipped."""
+        df = pd.DataFrame(
+            {
+                "target": [0, 1, 0, 1, 0, 1],
+                "null_col": [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                "good_col": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            targetviz_report(
+                df, target="target", output_dir=tmpdir + os.sep, name_file_out="test.html"
+            )
+            html_path = os.path.join(tmpdir, "test.html")
+            with open(html_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            assert "1 variable skipped" in html
+            assert "null_col" in html
+            assert "missing" in html
+
+    def test_multiple_skipped_columns(self):
+        """Multiple skipped columns should all appear."""
+        df = pd.DataFrame(
+            {
+                "target": [0, 1, 0, 1, 0, 1, 0, 1],
+                "const_a": [1, 1, 1, 1, 1, 1, 1, 1],
+                "null_b": [None] * 8,
+                "const_c": ["x", "x", "x", "x", "x", "x", "x", "x"],
+                "good_col": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            targetviz_report(
+                df, target="target", output_dir=tmpdir + os.sep, name_file_out="test.html"
+            )
+            html_path = os.path.join(tmpdir, "test.html")
+            with open(html_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            assert "3 variables skipped" in html
+            assert "const_a" in html
+            assert "null_b" in html
+            assert "const_c" in html
+
+    def test_no_skipped_columns_no_banner(self):
+        """When no columns are skipped, the banner should not appear."""
+        df = pd.DataFrame(
+            {
+                "target": [0, 1, 0, 1, 0, 1],
+                "x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+                "y": [10, 20, 30, 40, 50, 60],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            targetviz_report(
+                df, target="target", output_dir=tmpdir + os.sep, name_file_out="test.html"
+            )
+            html_path = os.path.join(tmpdir, "test.html")
+            with open(html_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            assert "variable" not in html.lower() or "skipped" not in html.lower()
+            assert "<details" not in html
+
+    def test_skipped_section_is_collapsed_by_default(self):
+        """The details element should not have the 'open' attribute."""
+        df = pd.DataFrame(
+            {
+                "target": [0, 1, 0, 1, 0, 1],
+                "const_col": [5, 5, 5, 5, 5, 5],
+                "good_col": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            targetviz_report(
+                df, target="target", output_dir=tmpdir + os.sep, name_file_out="test.html"
+            )
+            html_path = os.path.join(tmpdir, "test.html")
+            with open(html_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            # <details> present but NOT <details open>
+            assert "<details" in html
+            assert "open" not in html.split("</details>")[0].split("<details")[1]
