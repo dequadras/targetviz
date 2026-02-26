@@ -37,7 +37,7 @@ Let's start by generating the report, for that we will use the code in the [exam
 
 Notice we have added outlier removal. If we set it to 5%, it will remove the top 2.5% and bottom 2.5% of rows when analysing each column (e.g. rows where column income is very high or very low). This typically makes the plots nicer.
 
-So we have the report generated [here](./samples/cal_housing.html). Let's take a look.
+So we have the report generated [here](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/cal_housing.html). Let's take a look.
 
 First we have a quick univariate analysis of the target value (median price of houses in units of 100k USD), in this case it is a regression, but it also accepts binary or categorical variables.
 From the histogram we can see that the values go from 0 to 5, the spike at 5 suggest results might have been clipped. We can see the mode at ~1.5 and the mean close to 2. We probably would have expected a long tail on the right if results had not been clipped
@@ -72,7 +72,7 @@ and we divide this number by the total sum of squares to get the percentage expl
 
 
 ## Another example
-We can also compute the same report for the titanic dataset ([see result](./samples/titanic.html))]
+We can also compute the same report for the titanic dataset ([see result](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/titanic.html))
 
 
 ```py
@@ -88,3 +88,20 @@ titanic = pd.read_csv(url)
 # Generate HTML report in the current directory
 targetviz.targetviz_report(titanic, target='Survived', output_dir='./', name_file_out="titanic.html", pct_outliers=.05)
 ```
+
+
+## Sample Reports
+
+Below are rendered reports for various datasets:
+
+| Dataset | Description | Link |
+|---------|-------------|------|
+| California Housing | Regression – house prices | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/cal_housing.html) |
+| Titanic | Binary – survival | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/titanic.html) |
+| Iris | Categorical – species | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/iris.html) |
+| Breast Cancer | Binary – diagnosis | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/breast_cancer.html) |
+| Wine Quality | Regression – quality score | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/wine_quality.html) |
+| Bank Marketing | Binary – subscription | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/bank_marketing.html) |
+| Census | Binary – income | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/census.html) |
+| Chicago Employees | Regression – salary | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/chicago_employees.html) |
+| Cars | Regression – price | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/cars.html) |

@@ -562,6 +562,8 @@ class ColumnAnalyzer(BaseAnalyzer):
                     warnings.filterwarnings(
                         "ignore", message="vert", category=PendingDeprecationWarning
                     )
+                    # seaborn <0.13 calls groupby without observed=; suppress pandas FutureWarning
+                    warnings.filterwarnings("ignore", message="observed", category=FutureWarning)
                     sns.boxplot(x=cut_col, y=df_small[self.target], showfliers=False, ax=ax0)
                 truncate_labels(ax0, self.config)
                 ax0.set_xticks(range(len(ax0.get_xticklabels())))
@@ -592,6 +594,8 @@ class ColumnAnalyzer(BaseAnalyzer):
                     warnings.filterwarnings(
                         "ignore", message="vert", category=PendingDeprecationWarning
                     )
+                    # seaborn <0.13 calls groupby without observed=; suppress pandas FutureWarning
+                    warnings.filterwarnings("ignore", message="observed", category=FutureWarning)
                     sns.boxplot(
                         x=df_small[self.col],
                         y=df_small[self.target],

@@ -1,10 +1,14 @@
 """Plotting utility functions for targetviz."""
 
+import logging
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from targetviz.config import Settings
+
+log = logging.getLogger("targetviz")
 
 
 def plot_kde(series: pd.Series, ax: plt.Axes, config_: Settings) -> None:
@@ -18,7 +22,7 @@ def plot_kde(series: pd.Series, ax: plt.Axes, config_: Settings) -> None:
     try:
         series.plot.kde(ind=ind, ax=ax)
     except np.linalg.LinAlgError:
-        print("not able to kde")
+        log.warning("Not able to compute KDE")
 
 
 def truncate_labels(ax, config: Settings):

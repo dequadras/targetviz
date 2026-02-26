@@ -23,16 +23,23 @@ def _get_template_path(fname: str) -> os.PathLike:
 
 def create_log() -> logging.Logger:
     """
-    Create logger and formatters for console output
+    Create logger and formatters for console output.
+
+    Uses an explicit StreamHandler on the ``targetviz`` logger so that
+    messages are visible even in environments where the root logger is
+    already configured (Kaggle / Databricks / Colab notebooks).
     """
-    log_format = "%(asctime)s %(levelname)-8s %(message)s"
-    date_format = "%Y-%m-%d %H:%M:%S"
-
-    logging.basicConfig(
-        format=log_format, level=os.environ.get("LOGLEVEL", "INFO"), datefmt=date_format
-    )
-
     log = logging.getLogger("targetviz")
+
+    if not log.handlers:
+        log_format = "%(asctime)s %(levelname)-8s %(message)s"
+        date_format = "%Y-%m-%d %H:%M:%S"
+
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+        log.addHandler(handler)
+
+    log.setLevel(os.environ.get("LOGLEVEL", "INFO"))
 
     return log
 
