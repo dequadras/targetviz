@@ -82,7 +82,7 @@
                 <tr style="background-color: {{ '#ffffff' if loop.index is odd else '#f7f9fc' }};">
                     <td style="border: 1px solid #ddd; padding: 5px 10px; color: #888;">{{ loop.index }}</td>
                     <td style="border: 1px solid #ddd; padding: 5px 10px;">
-                        <a href="#var-{{ entry.name | replace(' ', '-') | replace('.', '-') }}" style="color: #2980b9; text-decoration: none;">{{ entry.name }}</a>
+                        <a href="#var-{{ entry.name | replace(' ', '-') | replace('.', '-') }}" style="color: #2980b9; text-decoration: none;" onclick="event.preventDefault();var el=document.getElementById('var-{{ entry.name | replace(' ', '-') | replace('.', '-') }}');if(el)el.scrollIntoView({behavior:'smooth'});">{{ entry.name }}</a>
                     </td>
                     <td style="border: 1px solid #ddd; padding: 5px 10px; text-align: right; font-family: monospace;">{{ "{:.2f}%".format(entry.explained_var * 100) }}</td>
                 </tr>
