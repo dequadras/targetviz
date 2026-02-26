@@ -29,9 +29,9 @@ class TargetVizReport:
         """
         escaped = html.escape(self._html, quote=True)
         return (
-            '<iframe width="100%" frameborder="0" '
+            '<iframe width="100%" height="600" frameborder="0" '
             f'srcdoc="{escaped}" '
-            'style="height: 600px; border: 1px solid #ddd; border-radius: 4px;">'
+            'style="border: 1px solid #ddd; border-radius: 4px;">'
             "</iframe>"
         )
 
