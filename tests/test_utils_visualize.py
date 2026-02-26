@@ -102,8 +102,10 @@ class TestPlotKde:
         plot_kde(s, ax, config_)
         plt.close()
 
-    def test_constant_series_handles_linalg_error(self, capsys):
+    def test_constant_series_handles_linalg_error(self, caplog):
         """A constant series triggers LinAlgError which should be caught."""
+        import logging
+
         from targetviz.config import Settings
         from targetviz.visualize import plot_kde
 
@@ -111,9 +113,9 @@ class TestPlotKde:
         s = pd.Series([5.0] * 100)
         fig, ax = plt.subplots()
         # Should not raise — LinAlgError is caught internally
-        plot_kde(s, ax, config_)
-        captured = capsys.readouterr()
-        assert "not able to kde" in captured.out
+        with caplog.at_level(logging.WARNING, logger="targetviz"):
+            plot_kde(s, ax, config_)
+        assert "Not able to compute KDE" in caplog.text
         plt.close()
 
     def test_small_series(self):
