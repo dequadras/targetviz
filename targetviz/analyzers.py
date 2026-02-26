@@ -1,6 +1,7 @@
 """Analyzer classes for targetviz."""
 
 import logging
+import warnings
 from datetime import date as _date_type
 from datetime import datetime as _datetime_type
 from typing import Any, List, Literal, Optional, Tuple
@@ -144,7 +145,7 @@ def _coerce_to_datetime(series: pd.Series) -> pd.Series:
     if ptypes.is_datetime64_any_dtype(series.dtype):
         return series
     try:
-        return pd.to_datetime(series)
+        return pd.to_datetime(series, format="mixed")
     except (ValueError, TypeError, OverflowError):
         return series
 
@@ -290,6 +291,11 @@ class BaseAnalyzer:
             "is_date": is_date,
             "formatter": "{}" if is_date else "{:.2f}",
         }
+
+        # Replace infinite values with NaN so stats functions produce meaningful
+        # results instead of triggering numpy RuntimeWarnings.
+        if not is_cat and not is_date:
+            series = series.replace([np.inf, -np.inf], np.nan)
 
         list_stat.append(get_num_values(series))
         list_stat.append(get_num_unique_values(series))
@@ -507,7 +513,12 @@ class ColumnAnalyzer(BaseAnalyzer):
 
         if self.type in ["CAT", "BINARY", "DATE"]:
             if target_type == "NUM":
-                sns.boxplot(x=cut_col, y=df_small[self.target], showfliers=False, ax=ax0)
+                with warnings.catch_warnings():
+                    # seaborn internally passes vert= to matplotlib; suppress until seaborn updates
+                    warnings.filterwarnings(
+                        "ignore", message="vert", category=PendingDeprecationWarning
+                    )
+                    sns.boxplot(x=cut_col, y=df_small[self.target], showfliers=False, ax=ax0)
                 truncate_labels(ax0, self.config)
                 ax0.set_xticks(range(len(ax0.get_xticklabels())))
                 ax0.set_xticklabels(ax0.get_xticklabels(), rotation=30, ha="right")
@@ -532,13 +543,17 @@ class ColumnAnalyzer(BaseAnalyzer):
                 ax0.set(xlim=(df_small[self.col].min(), df_small[self.col].max()))
                 truncate_labels(ax0, self.config)
             elif target_type in ["BINARY", "CAT"]:
-                sns.boxplot(
-                    x=df_small[self.col],
-                    y=df_small[self.target],
-                    ax=ax0,
-                    orient="h",
-                    showfliers=False,
-                )
+                with warnings.catch_warnings():
+                    # seaborn internally passes vert= to matplotlib; suppress until seaborn updates
+                    warnings.filterwarnings(
+                        "ignore", message="vert", category=PendingDeprecationWarning
+                    )
+                    sns.boxplot(
+                        x=df_small[self.col],
+                        y=df_small[self.target],
+                        ax=ax0,
+                        showfliers=False,
+                    )
                 truncate_labels(ax0, self.config)
         plt.title(" ", fontsize=20)  # necessary so that space is left for main title
 
