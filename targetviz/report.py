@@ -67,6 +67,56 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
         html_out = extra_template.render(result_dict=result_dict, column=col)
         html += html_out
 
+    # Append methodology note about explained variance
+    ev_note = (
+        '\n    <hr style="margin-top: 40px; border: none;'
+        ' border-top: 1px solid #ccc;">'
+        '\n    <div style="margin: 20px 0 30px 0;'
+        " padding: 14px 18px; background-color: #f7f9fc;"
+        " border: 1px solid #c8d6e5; border-radius: 6px;"
+        ' font-size: 0.88em; color: #555;">'
+        "\n        <strong>How Explained Variance is"
+        " calculated</strong>"
+        '\n        <p style="margin: 8px 0 4px 0;">'
+        "\n            Each variable is binned into groups"
+        " and the <em>Explained Variance</em> measures"
+        " how much of the target's total variance is"
+        " accounted for by those groups. It is computed as:"
+        "\n        </p>"
+        '\n        <p style="margin: 4px 0;'
+        ' font-family: monospace; padding-left: 12px;">'
+        "\n            Explained Variance = 1 &minus;"
+        " SS<sub>within</sub> / SS<sub>total</sub>"
+        "\n        </p>"
+        '\n        <p style="margin: 4px 0;">'
+        "\n            where <b>SS<sub>total</sub></b>"
+        " = &sum; (y<sub>i</sub> &minus; ȳ)<sup>2</sup>"
+        " is the total sum of squares"
+        " and <b>SS<sub>within</sub></b>"
+        " = &sum;<sub>g</sub>"
+        " &sum;<sub>i &isin; g</sub>"
+        " (y<sub>i</sub> &minus; ȳ<sub>g</sub>)"
+        "<sup>2</sup>"
+        " is the within-group (residual) sum of squares."
+        "\n        </p>"
+        '\n        <p style="margin: 4px 0;">'
+        "\n            The result is then multiplied by the"
+        " <em>rate of non-null values</em> for that"
+        " variable, so variables with many missing values"
+        " are penalised."
+        "\n        </p>"
+        '\n        <p style="margin: 4px 0;">'
+        "\n            For <b>categorical / binary"
+        " targets</b>, the above formula is applied"
+        " separately for each target class (treating it"
+        " as a binary indicator), and the final explained"
+        " variance is the <em>mean across all classes</em>"
+        ", again weighted by the non-null rate."
+        "\n        </p>"
+        "\n    </div>\n"
+    )
+    html += ev_note
+
     # Close the wrapper div, body and html tags opened in base.html
     html += "\n    </div>\n</body>\n</html>"
 
