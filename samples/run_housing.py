@@ -9,6 +9,11 @@ import targetviz
 data = fetch_california_housing()
 df = pd.DataFrame(data.data, columns=data.feature_names)
 df["MedHouseVal"] = data.target
+df["state"] = "California"  # Add a constant column to demonstrate categorical target handling
+df["main_cities"] = [["San Francisco", "Los Angeles"]] * len(
+    df
+)  # Add a constant column to demonstrate categorical target handling
+
 
 print(f"Loaded California Housing dataset: {df.shape[0]} rows, {df.shape[1]} columns")
 print(f"Columns: {list(df.columns)}")

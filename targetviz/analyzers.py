@@ -114,6 +114,40 @@ def _is_datetime_dtype(dtype) -> bool:
     return False
 
 
+def _has_nonscalar_values(series: pd.Series) -> Optional[str]:
+    """Check if an object-dtype series contains non-scalar values (lists, dicts, etc.).
+
+    Samples up to 50 non-null values and checks their Python types.
+    Returns a string describing the unsupported types found, or None if all
+    values are scalar (str, numbers, dates, booleans, None).
+    """
+    if not ptypes.is_object_dtype(series.dtype):
+        return None
+    non_null = series.dropna()
+    if len(non_null) == 0:
+        return None
+    _scalar_types = (
+        str,
+        int,
+        float,
+        complex,
+        bool,
+        np.integer,
+        np.floating,
+        np.bool_,
+        _date_type,
+        _datetime_type,
+    )
+    sample = non_null.head(min(50, len(non_null)))
+    bad_types: set = set()
+    for v in sample:
+        if not isinstance(v, _scalar_types):
+            bad_types.add(type(v).__name__)
+    if bad_types:
+        return ", ".join(sorted(bad_types))
+    return None
+
+
 def _is_date_object_column(series: pd.Series) -> bool:
     """Check if an object-dtype series actually contains date/datetime objects.
 
@@ -422,6 +456,16 @@ class ColumnAnalyzer(BaseAnalyzer):
         """
         Main function for running the column analysis
         """
+        # Check for non-scalar values (lists, dicts, etc.) in object columns
+        # before any other check, since unhashable types crash nunique()/etc.
+        bad_types = _has_nonscalar_values(data[self.col])
+        if bad_types:
+            result_dict.setdefault("skipped_variables", []).append(
+                {"name": self.col, "reason": f"Contains non-scalar values ({bad_types})"}
+            )
+            self.log.warning(f"Skipping column {self.col}: contains non-scalar types: {bad_types}")
+            return result_dict
+
         if not self.sanity_checks(data):
             result_dict.setdefault("skipped_variables", []).append(
                 {"name": self.col, "reason": "All values are missing (no non-null values)"}

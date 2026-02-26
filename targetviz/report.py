@@ -30,15 +30,14 @@ def sort_cols_by_exp_var(result_dict: ResultDict, columns: List[str]) -> List[st
     return used_cols
 
 
-def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -> None:
+def build_html(result_dict: ResultDict, columns: List[str]) -> str:
     """
-    Create html file, populate and render file
+    Build the full HTML report string from result_dict and columns.
+    Returns the complete HTML as a string.
     """
-    # Create html file and render
     base_html = _get_template_path("base.html")
 
     # fill jinja template with data
-    # Use UTF-8 encoding when reading template files
     with open(base_html, "r", encoding="utf-8") as file:
         template = Template(file.read())
     extra_html = _get_template_path("extra_col.html")
@@ -59,7 +58,6 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
         toc_entries=toc_entries,
     )
 
-    # Use UTF-8 encoding when reading template files
     with open(extra_html, "r", encoding="utf-8") as file:
         extra_template = Template(file.read())
 
@@ -119,6 +117,15 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
 
     # Close the wrapper div, body and html tags opened in base.html
     html += "\n    </div>\n</body>\n</html>"
+
+    return html
+
+
+def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -> None:
+    """
+    Create html file, populate and render file
+    """
+    html = build_html(result_dict, columns)
 
     # Check if output should be zipped
     if name_html.endswith(".html.zip"):
