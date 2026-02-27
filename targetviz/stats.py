@@ -86,5 +86,14 @@ def get_quantiles(
     if desc_params["is_cat"]:
         list_quantiles = ["-"] * len(quantiles)
     else:
-        list_quantiles = [formatter.format(series.quantile(quantile)) for quantile in quantiles]
+        # Compute all quantiles in one vectorised call instead of one-by-one.
+        # For large series, use numpy directly on the underlying array
+        # with linear interpolation for speed (approximate but fast).
+        values = series.dropna().to_numpy()
+        if len(values) == 0:
+            list_quantiles = ["-"] * len(quantiles)
+        else:
+            percentiles = [q * 100 for q in quantiles]
+            results = np.nanpercentile(values, percentiles, method="linear")
+            list_quantiles = [formatter.format(r) for r in results]
     return list_quantiles

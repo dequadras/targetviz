@@ -2,11 +2,14 @@
 
 import logging
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from targetviz.config import Settings
+matplotlib.use("Agg")
+
+from targetviz.config import Settings  # noqa: E402
 
 log = logging.getLogger("targetviz")
 
@@ -18,7 +21,8 @@ def plot_kde(series: pd.Series, ax: plt.Axes, config_: Settings) -> None:
     max_sample = config_.kde.max_sample
     ind = config_.kde.ind
     if len(series) > max_sample:
-        series = series.sample(max_sample)
+        idx = np.random.randint(0, len(series), max_sample)
+        series = series.iloc[idx]
     try:
         series.plot.kde(ind=ind, ax=ax)
     except np.linalg.LinAlgError:

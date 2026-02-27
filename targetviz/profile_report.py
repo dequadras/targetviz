@@ -1,5 +1,6 @@
 """Main entry point for generating targetviz reports."""
 
+import warnings
 from datetime import datetime
 from typing import Any, List, Optional
 
@@ -52,10 +53,13 @@ def targetviz_report(
     config.target_type = target_analyzer.type
 
     total_cols: int = len(columns)
-    for i, col in enumerate(columns, start=1):
-        log.info(f"({i}/{total_cols}) Analyzing column: {col}")
-        col_analyzer = ColumnAnalyzer(col, target, config, log)
-        result_dict = col_analyzer.run(data, result_dict)
+    with warnings.catch_warnings():
+        # seaborn <0.13 calls groupby without observed=; suppress pandas FutureWarning
+        warnings.filterwarnings("ignore", message="observed", category=FutureWarning)
+        for i, col in enumerate(columns, start=1):
+            log.info(f"({i}/{total_cols}) Analyzing column: {col}")
+            col_analyzer = ColumnAnalyzer(col, target, config, log)
+            result_dict = col_analyzer.run(data, result_dict)
 
     # Build the HTML report
     html_content = build_html(result_dict, columns)

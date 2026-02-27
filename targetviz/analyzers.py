@@ -355,7 +355,7 @@ class BaseAnalyzer:
 
             series.hist(ax=ax)
         else:
-            series.hist(bins=30, density=1, ax=ax)
+            ax.hist(series.to_numpy(), bins=30, density=True)
             plot_kde(series, ax, self.config)
             ax.set(xlim=(series.min(), series.max()))
             ax.axvline(x=series.mean(), color="orange", linestyle="--")
@@ -388,6 +388,7 @@ class TargetAnalyzer(BaseAnalyzer):
         """
         method for running the main function from TargetAnalyzer
         """
+        data = data.copy()  # avoid SettingWithCopyWarning when modifying target column
         dfs = get_df_small(data, self.target, self.target)
         dfs = self.get_type(dfs)
         data[self.target] = dfs[self.target]
@@ -409,14 +410,13 @@ class ColumnAnalyzer(BaseAnalyzer):
         """
         Return a dataset with no nulls, infinite and remove outliers when necessary
         """
-        df_clean = df_small[~df_small[self.col].isna()]
+        col_series = df_small[self.col]
+        mask = col_series.notna()
         if self.type == "NUM":
-            df_clean = df_clean[
-                np.isfinite(df_clean[self.col].to_numpy(dtype=float, na_value=np.nan))
-            ]  # infinite removed
-            if self.config.pct_outliers > 0:
-                # remove outliers (only in numeric data)
-                df_clean = self.remove_outliers(df_clean)
+            mask = mask & np.isfinite(col_series.to_numpy(dtype=float, na_value=np.nan))
+        df_clean = df_small[mask]
+        if self.type == "NUM" and self.config.pct_outliers > 0:
+            df_clean = self.remove_outliers(df_clean)
         self.rate_non_nulls = df_clean.shape[0] / df_small.shape[0]
         return df_clean
 
@@ -428,10 +428,10 @@ class ColumnAnalyzer(BaseAnalyzer):
         """
         pct_outliers = self.config.pct_outliers
         limits = [pct_outliers / 2, 1 - pct_outliers / 2]
-        pct_val = [data[self.col].quantile(limits[0]), data[self.col].quantile(limits[1])]
-        data = data[data[self.col] >= pct_val[0]]
-        data = data[data[self.col] <= pct_val[1]]
-        return data
+        col_values = data[self.col].to_numpy(dtype=float)
+        lo, hi = np.nanpercentile(col_values, [limits[0] * 100, limits[1] * 100])
+        mask = (col_values >= lo) & (col_values <= hi)
+        return data[mask]
 
     def sanity_checks(self, data: pd.DataFrame) -> bool:
         """
@@ -513,34 +513,47 @@ class ColumnAnalyzer(BaseAnalyzer):
 
     def plot_cut_var_target_relation(self, df_small: pd.DataFrame, cut_col: pd.Series) -> None:
         """
-        Plots of relation between buckets of column and target value
+        Plots of relation between buckets of column and target value.
+
+        Optimised to use a single aggregation pass (groupby.agg or crosstab)
+        instead of separate unique(), per-value groupby, and value_counts calls.
         """
         ax1 = plt.subplot2grid((2, 2), (0, 1))
-        # add y label to ax1
         target_type = self.config.target_type
+
         if target_type == "NUM":
-            df_small[self.target].groupby(cut_col, observed=False).mean().plot(ax=ax1)
+            # One groupby pass yields both the mean line-chart and the bar-chart counts.
+            agg = df_small[self.target].groupby(cut_col, observed=False).agg(["mean", "count"])
+            agg["mean"].plot(ax=ax1)
+            bucket_counts = agg["count"]
             truncate_labels(ax1, self.config)
             plt.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
         elif target_type in ["BINARY", "CAT"]:
-            target_values = np.sort(df_small[self.target].unique())
-            legend_vals = []
-            for target_val in target_values:
-                if (target_val == 0) & (target_type == "BINARY"):
-                    # for binary plot plot only one class
-                    if not self.config.plot_0_in_binary_target:
-                        continue
-                (df_small[self.target] == target_val).groupby(cut_col, observed=False).mean().plot(
-                    ax=ax1, marker="o"
-                )
-                legend_vals.append(target_val)
-            plt.legend(legend_vals)
+            # Single crosstab replaces np.sort(unique()) + N separate groupby().mean() calls.
+            ct = pd.crosstab(cut_col, df_small[self.target])
+            # Ensure every bucket category is present (mirrors observed=False).
+            if hasattr(cut_col, "cat"):
+                ct = ct.reindex(cut_col.cat.categories, fill_value=0)
+            bucket_counts = ct.sum(axis=1)
+            ct_pct = ct.div(bucket_counts, axis=0)
+
+            # Determine which target values to plot
+            plot_df = ct_pct
+            if target_type == "BINARY" and not self.config.plot_0_in_binary_target:
+                drop_cols = [c for c in ct_pct.columns if c == 0]
+                plot_df = ct_pct.drop(columns=drop_cols)
+
+            plot_df.plot(ax=ax1, marker="o")
+            plt.legend(plot_df.columns.tolist())
             truncate_labels(ax1, self.config)
             plt.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+        else:
+            # Fallback (should not happen – target types are NUM/BINARY/CAT)
+            bucket_counts = cut_col.value_counts().sort_index()
 
         ax1.set_ylabel(self.target + " mean")
         ax2 = plt.subplot2grid((2, 2), (1, 1), sharex=ax1)
-        cut_col.value_counts().sort_index().plot(kind="bar", ax=ax2)
+        bucket_counts.plot(kind="bar", ax=ax2)
         ax2.set_ylabel("Count")
         truncate_labels(ax2, self.config)
         plt.xticks(rotation=30, ha="right")
@@ -639,11 +652,13 @@ class ColumnAnalyzer(BaseAnalyzer):
             else:
                 if self.type == "DATE":
                     cut_col = pd.qcut(
-                        df_small[self.col].dt.strftime("%Y%m%d").astype(int),
+                        df_small[self.col].astype(np.int64),
                         n_breaks,
                         duplicates="drop",
                         precision=self.config.qcut_precision,
-                    ).cat.remove_unused_categories()
+                    )
+                    if len(cut_col.cat.categories) != cut_col.nunique():
+                        cut_col = cut_col.cat.remove_unused_categories()
                     cut_col = _clean_interval_categories(cut_col)
 
                 else:
@@ -652,7 +667,9 @@ class ColumnAnalyzer(BaseAnalyzer):
                         n_breaks,
                         duplicates="drop",
                         precision=self.config.qcut_precision,
-                    ).cat.remove_unused_categories()
+                    )
+                    if len(cut_col.cat.categories) != cut_col.nunique():
+                        cut_col = cut_col.cat.remove_unused_categories()
                     cut_col = _clean_interval_categories(cut_col)
         if cut_col.nunique() == 1:
             warning_msg = (
@@ -673,21 +690,51 @@ class ColumnAnalyzer(BaseAnalyzer):
             parts = [f"P({v})={r:.2%}" for v, r in vc.items()]
             return ", ".join(parts)
 
+    @staticmethod
+    def _format_expected_value_np(
+        target_arr: np.ndarray, target_type: str, unique_classes: Optional[np.ndarray] = None
+    ) -> str:
+        """Format expected value from a numpy array (fast path)."""
+        if target_type == "NUM":
+            return f"{np.mean(target_arr):.4f}"
+        else:
+            # BINARY or CAT — compute normalised counts via numpy
+            if unique_classes is None:
+                unique_classes = np.unique(target_arr)
+            n = len(target_arr)
+            parts = []
+            for cls in unique_classes:
+                rate = np.sum(target_arr == cls) / n
+                parts.append(f"P({cls})={rate:.2%}")
+            return ", ".join(parts)
+
     def compute_target_expected_values(self, df_small: pd.DataFrame) -> str:
         """Compute expected value of target for null/not-null and outlier/not-outlier groups.
 
         Returns an HTML string with the stats.
         """
-        stats_parts = []
+        # Extract numpy arrays once — avoids repeated pandas indexing overhead
+        col_arr = df_small[self.col].to_numpy()
+        target_arr = df_small[self.target].to_numpy()
+        target_type = self.config.target_type
+
+        # Pre-compute sorted unique classes for BINARY/CAT (reused in every call)
+        unique_classes = np.unique(target_arr) if target_type != "NUM" else None
+
+        stats_parts: list[str] = []
 
         # --- Null vs not-null ---
-        null_mask = df_small[self.col].isna()
+        null_mask = pd.isna(col_arr)
         null_count = int(null_mask.sum())
         not_null_count = int((~null_mask).sum())
 
         if null_count > 0 and not_null_count > 0:
-            ev_null = self._format_expected_value(df_small.loc[null_mask, self.target])
-            ev_not_null = self._format_expected_value(df_small.loc[~null_mask, self.target])
+            ev_null = self._format_expected_value_np(
+                target_arr[null_mask], target_type, unique_classes
+            )
+            ev_not_null = self._format_expected_value_np(
+                target_arr[~null_mask], target_type, unique_classes
+            )
             stats_parts.append(
                 f"<b>E[{self.target} | {self.col} is null]</b> = {ev_null} &nbsp;(n={null_count})"
             )
@@ -701,24 +748,28 @@ class ColumnAnalyzer(BaseAnalyzer):
         # --- Outlier vs not-outlier (numeric predictors only) ---
         if self.type == "NUM" and self.config.pct_outliers > 0:
             pct_outliers = self.config.pct_outliers
-            limits = [pct_outliers / 2, 1 - pct_outliers / 2]
-            non_null = df_small.loc[~null_mask].copy()
-            non_null = non_null[
-                np.isfinite(non_null[self.col].to_numpy(dtype=float, na_value=np.nan))
-            ]
-            if non_null.shape[0] > 0:
-                lower = non_null[self.col].quantile(limits[0])
-                upper = non_null[self.col].quantile(limits[1])
-                outlier_mask = (non_null[self.col] < lower) | (non_null[self.col] > upper)
+            pct_lo = pct_outliers / 2 * 100  # convert to percentile for numpy
+            pct_hi = (1 - pct_outliers / 2) * 100
+
+            # Work on non-null, finite values only — pure numpy, no DataFrame copy
+            col_float = col_arr.astype(float, copy=False)
+            finite_mask = (~null_mask) & np.isfinite(col_float)
+            col_finite = col_float[finite_mask]
+            target_finite = target_arr[finite_mask]
+
+            if col_finite.shape[0] > 0:
+                # Single numpy percentile call for both bounds
+                lower, upper = np.nanpercentile(col_finite, [pct_lo, pct_hi])
+                outlier_mask = (col_finite < lower) | (col_finite > upper)
                 outlier_count = int(outlier_mask.sum())
                 not_outlier_count = int((~outlier_mask).sum())
 
                 if outlier_count > 0 and not_outlier_count > 0:
-                    ev_outlier = self._format_expected_value(
-                        non_null.loc[outlier_mask, self.target]
+                    ev_outlier = self._format_expected_value_np(
+                        target_finite[outlier_mask], target_type, unique_classes
                     )
-                    ev_not_outlier = self._format_expected_value(
-                        non_null.loc[~outlier_mask, self.target]
+                    ev_not_outlier = self._format_expected_value_np(
+                        target_finite[~outlier_mask], target_type, unique_classes
                     )
                     stats_parts.append(
                         f"<b>E[{self.target} | {self.col} is outlier]</b> = {ev_outlier} "
@@ -758,28 +809,77 @@ class ColumnAnalyzer(BaseAnalyzer):
 
     def calc_explained_variance_cat(self, series_target: pd.Series, cut_series: pd.Series) -> float:
         """
-        Perform calc_explained_variance for the case of categorical/binary target
+        Perform calc_explained_variance for the case of categorical/binary target.
+
+        Uses a single crosstab + vectorised Bernoulli-variance math instead of
+        looping over every target class with a full groupby each time.
         """
-        exp_var_list = []
-        for target_val in series_target.unique():
-            series_target_cat = series_target == target_val
-            exp_var_list.append(self.calc_explained_variance_(series_target_cat, cut_series))
-        return np.mean(exp_var_list) * self.rate_non_nulls
+        # Single cross-tabulation: rows = bins, columns = target classes
+        ct = pd.crosstab(cut_series, series_target)
+        group_counts = ct.sum(axis=1).values.astype(float)  # n_i per bin
+        n_total = float(group_counts.sum())
+
+        if n_total == 0:
+            return 0.0
+
+        # Overall proportion of each class across the whole dataset
+        class_totals = ct.sum(axis=0).values.astype(float)
+        p_overall = class_totals / n_total  # shape (n_classes,)
+
+        # Per-group proportion of each class
+        # Avoid division by zero for empty groups
+        safe_counts = np.where(group_counts > 0, group_counts, 1.0)
+        p_group = ct.values.astype(float) / safe_counts[:, np.newaxis]  # (n_groups, n_classes)
+
+        # Bernoulli variance: p*(1-p)
+        var_overall = p_overall * (1.0 - p_overall)  # (n_classes,)
+        var_group = p_group * (1.0 - p_group)  # (n_groups, n_classes)
+
+        # Total SS per class = var_overall * n_total
+        total_ss = var_overall * n_total  # (n_classes,)
+
+        # Within-group SS per class = sum_i( n_i * var_i )
+        within_ss = (var_group * group_counts[:, np.newaxis]).sum(axis=0)  # (n_classes,)
+
+        # Explained variance per class, guarding against zero total variance
+        ev_per_class = np.where(total_ss > 0, 1.0 - within_ss / total_ss, 0.0)
+
+        return float(np.mean(ev_per_class)) * self.rate_non_nulls
 
     @staticmethod
     def calc_explained_variance_(series_target: pd.Series, cut_series: pd.Series) -> float:
         """
-        Generic method for calc explained variance
+        Generic method for calc explained variance.
+
+        Uses pure numpy (np.bincount) instead of pandas groupby for speed.
         """
-        variance = series_target.var(ddof=0) * series_target.shape[0]
+        target = np.asarray(series_target, dtype=np.float64)
+        n = target.shape[0]
 
-        non_exp_variance = (
-            series_target.groupby(cut_series, observed=False).var(ddof=0).values
-            * series_target.groupby(cut_series, observed=False).count().values
-        ).sum()
+        total_ss = target.var(ddof=0) * n  # = sum of (x - mean)^2
+        if total_ss == 0:
+            return 0.0
 
-        # Handle the case where variance is zero to avoid division by zero
-        if variance == 0:
-            return 0.0  # If variance is zero, there's no variation to explain
+        # Obtain integer group codes from the cut_series
+        if hasattr(cut_series, "cat"):
+            codes = cut_series.cat.codes.values
+        elif hasattr(cut_series, "codes"):
+            codes = cut_series.codes
         else:
-            return 1 - non_exp_variance / variance
+            _, codes = np.unique(np.asarray(cut_series), return_inverse=True)
+
+        n_groups = int(codes.max()) + 1
+
+        # Per-group sums and counts via bincount (single pass each)
+        group_sums = np.bincount(codes, weights=target, minlength=n_groups)
+        group_counts = np.bincount(codes, minlength=n_groups).astype(np.float64)
+
+        # Per-group means (safe division)
+        safe_counts = np.where(group_counts > 0, group_counts, 1.0)
+        group_means = group_sums / safe_counts
+
+        # Within-group SS = sum of (x_i - group_mean_i)^2
+        residuals = target - group_means[codes]
+        within_ss = residuals.dot(residuals)
+
+        return 1.0 - within_ss / total_ss
