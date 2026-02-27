@@ -30,7 +30,7 @@ def sort_cols_by_exp_var(result_dict: ResultDict, columns: List[str]) -> List[st
     return used_cols
 
 
-def build_html(result_dict: ResultDict, columns: List[str]) -> str:
+def build_html(result_dict: ResultDict, columns: List[str], name_html: str = "") -> str:
     """
     Build the full HTML report string from result_dict and columns.
     Returns the complete HTML as a string.
@@ -51,11 +51,22 @@ def build_html(result_dict: ResultDict, columns: List[str]) -> str:
         ev = result_dict[col].get("explained_var", 0)
         toc_entries.append({"name": col, "explained_var": ev})
 
+    # Derive a display name from the output filename (without .html extension)
+    if name_html:
+        report_name = os.path.basename(name_html)
+        for suffix in (".html.zip", ".html"):
+            if report_name.endswith(suffix):
+                report_name = report_name[: -len(suffix)]
+                break
+    else:
+        report_name = ""
+
     html = template.render(
         result_dict=result_dict,
         columns=columns,
         skipped_variables=skipped_variables,
         toc_entries=toc_entries,
+        report_name=report_name,
     )
 
     with open(extra_html, "r", encoding="utf-8") as file:
@@ -125,7 +136,7 @@ def render_output(result_dict: ResultDict, columns: List[str], name_html: str) -
     """
     Create html file, populate and render file
     """
-    html = build_html(result_dict, columns)
+    html = build_html(result_dict, columns, name_html)
 
     # Check if output should be zipped
     if name_html.endswith(".html.zip"):

@@ -810,41 +810,12 @@ class ColumnAnalyzer(BaseAnalyzer):
     def calc_explained_variance_cat(self, series_target: pd.Series, cut_series: pd.Series) -> float:
         """
         Perform calc_explained_variance for the case of categorical/binary target.
-
-        Uses a single crosstab + vectorised Bernoulli-variance math instead of
-        looping over every target class with a full groupby each time.
         """
-        # Single cross-tabulation: rows = bins, columns = target classes
-        ct = pd.crosstab(cut_series, series_target)
-        group_counts = ct.sum(axis=1).values.astype(float)  # n_i per bin
-        n_total = float(group_counts.sum())
-
-        if n_total == 0:
-            return 0.0
-
-        # Overall proportion of each class across the whole dataset
-        class_totals = ct.sum(axis=0).values.astype(float)
-        p_overall = class_totals / n_total  # shape (n_classes,)
-
-        # Per-group proportion of each class
-        # Avoid division by zero for empty groups
-        safe_counts = np.where(group_counts > 0, group_counts, 1.0)
-        p_group = ct.values.astype(float) / safe_counts[:, np.newaxis]  # (n_groups, n_classes)
-
-        # Bernoulli variance: p*(1-p)
-        var_overall = p_overall * (1.0 - p_overall)  # (n_classes,)
-        var_group = p_group * (1.0 - p_group)  # (n_groups, n_classes)
-
-        # Total SS per class = var_overall * n_total
-        total_ss = var_overall * n_total  # (n_classes,)
-
-        # Within-group SS per class = sum_i( n_i * var_i )
-        within_ss = (var_group * group_counts[:, np.newaxis]).sum(axis=0)  # (n_classes,)
-
-        # Explained variance per class, guarding against zero total variance
-        ev_per_class = np.where(total_ss > 0, 1.0 - within_ss / total_ss, 0.0)
-
-        return float(np.mean(ev_per_class)) * self.rate_non_nulls
+        exp_var_list = []
+        for target_val in series_target.unique():
+            series_target_cat = series_target == target_val
+            exp_var_list.append(self.calc_explained_variance_(series_target_cat, cut_series))
+        return np.mean(exp_var_list) * self.rate_non_nulls
 
     @staticmethod
     def calc_explained_variance_(series_target: pd.Series, cut_series: pd.Series) -> float:

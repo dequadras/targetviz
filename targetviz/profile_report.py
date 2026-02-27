@@ -62,7 +62,7 @@ def targetviz_report(
             result_dict = col_analyzer.run(data, result_dict)
 
     # Build the HTML report
-    html_content = build_html(result_dict, columns)
+    html_content = build_html(result_dict, columns, name_file_out)
     report = TargetVizReport(html_content)
 
     # Write to file unless output_dir is None (notebook-embedded mode)
