@@ -71,13 +71,11 @@ jobs:
         key: benchmark-${{ runner.os }}-py3.12
     - name: Run benchmarks
       run: |
-        pytest tests/test_benchmarks.py tests/test_benchmarks_plot.py \
-          --benchmark-enable \
-          --benchmark-only \
-          --benchmark-save=current \
-          --benchmark-compare \
-          --benchmark-compare-fail=mean:30% \
-          -v
+        BENCH_ARGS="--benchmark-enable --benchmark-only --benchmark-save=current -v"
+        if ls .benchmarks/*/*.json 2>/dev/null | grep -q .; then
+          BENCH_ARGS="$BENCH_ARGS --benchmark-compare --benchmark-compare-fail=mean:30%"
+        fi
+        pytest tests/test_benchmarks.py tests/test_benchmarks_plot.py $BENCH_ARGS
     - name: Save benchmark baseline
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |

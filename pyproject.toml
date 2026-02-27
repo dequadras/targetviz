@@ -32,6 +32,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pre-commit",
+    "pyarrow",
     "pytest>=7.0",
     "pytest-benchmark>=4.0",
 ]
