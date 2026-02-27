@@ -513,47 +513,34 @@ class ColumnAnalyzer(BaseAnalyzer):
 
     def plot_cut_var_target_relation(self, df_small: pd.DataFrame, cut_col: pd.Series) -> None:
         """
-        Plots of relation between buckets of column and target value.
-
-        Optimised to use a single aggregation pass (groupby.agg or crosstab)
-        instead of separate unique(), per-value groupby, and value_counts calls.
+        Plots of relation between buckets of column and target value
         """
         ax1 = plt.subplot2grid((2, 2), (0, 1))
+        # add y label to ax1
         target_type = self.config.target_type
-
         if target_type == "NUM":
-            # One groupby pass yields both the mean line-chart and the bar-chart counts.
-            agg = df_small[self.target].groupby(cut_col, observed=False).agg(["mean", "count"])
-            agg["mean"].plot(ax=ax1)
-            bucket_counts = agg["count"]
+            df_small[self.target].groupby(cut_col, observed=False).mean().plot(ax=ax1)
             truncate_labels(ax1, self.config)
             plt.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
         elif target_type in ["BINARY", "CAT"]:
-            # Single crosstab replaces np.sort(unique()) + N separate groupby().mean() calls.
-            ct = pd.crosstab(cut_col, df_small[self.target])
-            # Ensure every bucket category is present (mirrors observed=False).
-            if hasattr(cut_col, "cat"):
-                ct = ct.reindex(cut_col.cat.categories, fill_value=0)
-            bucket_counts = ct.sum(axis=1)
-            ct_pct = ct.div(bucket_counts, axis=0)
-
-            # Determine which target values to plot
-            plot_df = ct_pct
-            if target_type == "BINARY" and not self.config.plot_0_in_binary_target:
-                drop_cols = [c for c in ct_pct.columns if c == 0]
-                plot_df = ct_pct.drop(columns=drop_cols)
-
-            plot_df.plot(ax=ax1, marker="o")
-            plt.legend(plot_df.columns.tolist())
+            target_values = np.sort(df_small[self.target].unique())
+            legend_vals = []
+            for target_val in target_values:
+                if (target_val == 0) & (target_type == "BINARY"):
+                    # for binary plot plot only one class
+                    if not self.config.plot_0_in_binary_target:
+                        continue
+                (df_small[self.target] == target_val).groupby(cut_col, observed=False).mean().plot(
+                    ax=ax1, marker="o"
+                )
+                legend_vals.append(target_val)
+            plt.legend(legend_vals)
             truncate_labels(ax1, self.config)
             plt.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
-        else:
-            # Fallback (should not happen – target types are NUM/BINARY/CAT)
-            bucket_counts = cut_col.value_counts().sort_index()
 
         ax1.set_ylabel(self.target + " mean")
         ax2 = plt.subplot2grid((2, 2), (1, 1), sharex=ax1)
-        bucket_counts.plot(kind="bar", ax=ax2)
+        cut_col.value_counts().sort_index().plot(kind="bar", ax=ax2)
         ax2.set_ylabel("Count")
         truncate_labels(ax2, self.config)
         plt.xticks(rotation=30, ha="right")
