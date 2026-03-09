@@ -835,6 +835,38 @@ class TestComputeTargetExpectedValues:
         assert "col is not null" in html
         assert "outlier" not in html
 
+
+# ===================================================================
+# Warning suppression
+# ===================================================================
+
+
+class TestWarningSuppression:
+    """Seaborn/pandas FutureWarning about observed= must not leak out."""
+
+    def test_no_observed_futurewarning_on_categorical_target(self):
+        import tempfile
+        import warnings
+
+        from targetviz.profile_report import targetviz_report
+
+        df = pd.DataFrame(
+            {
+                "feature": pd.Categorical(["a", "b", "c", "a", "b", "c"]),
+                "target": [1, 0, 1, 0, 1, 0],
+            }
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with tempfile.TemporaryDirectory() as tmp:
+                targetviz_report(df, "target", output_dir=tmp + "/")
+        observed_warnings = [
+            w
+            for w in caught
+            if issubclass(w.category, FutureWarning) and "observed" in str(w.message)
+        ]
+        assert observed_warnings == [], f"FutureWarning about observed= leaked: {observed_warnings}"
+
     def test_no_outlier_section_for_binary_predictor(self):
         """Outlier analysis should NOT appear for binary predictors."""
         config_ = _make_config()

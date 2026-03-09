@@ -55,7 +55,7 @@ def targetviz_report(
     total_cols: int = len(columns)
     with warnings.catch_warnings():
         # seaborn <0.13 calls groupby without observed=; suppress pandas FutureWarning
-        warnings.filterwarnings("ignore", message="observed", category=FutureWarning)
+        warnings.filterwarnings("ignore", message=".*observed", category=FutureWarning)
         for i, col in enumerate(columns, start=1):
             log.info(f"({i}/{total_cols}) Analyzing column: {col}")
             col_analyzer = ColumnAnalyzer(col, target, config, log)
