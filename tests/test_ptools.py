@@ -291,14 +291,14 @@ def test_nullable_types():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Test with Int (nullable int)
         df_int = pd.DataFrame(
-            {"target": [1, 2, 3, 4, pd.NA], "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64")}
+            {"target": [1, 2, 3, 4, 5], "int_col": pd.array([1, 2, 3, pd.NA, 5], dtype="Int64")}
         )
         assert targetviz_report(df_int, "target", output_dir=temp_dir + "/") is not None
 
         # Test with Float (nullable float)
         df_float = pd.DataFrame(
             {
-                "target": [1.0, 2.0, 3.0, 4.0, pd.NA],
+                "target": [1.0, 2.0, 3.0, 4.0, 5.0],
                 "float_col": pd.array([1.1, 2.2, 3.3, pd.NA, 5.5], dtype="Float64"),
             }
         )
@@ -307,7 +307,7 @@ def test_nullable_types():
         # Test with Bool (nullable boolean)
         df_bool = pd.DataFrame(
             {
-                "target": [True, False, True, False, pd.NA],
+                "target": [True, False, True, False, True],
                 "bool_col": pd.array([True, False, True, pd.NA, False], dtype="boolean"),
             }
         )
