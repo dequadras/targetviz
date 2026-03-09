@@ -3,6 +3,7 @@
 from datetime import date, datetime
 
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -1066,3 +1067,34 @@ class TestWarningSuppression:
         assert "50.00%" in html
         # not-null group: [1, 1] → P(1)=100%
         assert "100.00%" in html
+
+
+# ===================================================================
+# BaseAnalyzer.plot_histogram — edge cases
+# ===================================================================
+
+
+class TestPlotHistogramConstantSeries:
+    """Regression test: plot_histogram must not raise when the cleaned series is constant.
+
+    This happens with zero-inflated numeric columns where outlier removal
+    leaves only the dominant value (e.g. all zeros).
+    """
+
+    def test_constant_numeric_series_no_warning(self):
+        """A constant numeric series should produce a histogram without the
+        'identical low and high xlims' matplotlib warning."""
+        config_ = _make_config()
+        log = _make_log()
+        analyzer = BaseAnalyzer("col", "target", config_, log)
+        analyzer.type = "NUM"
+
+        series = pd.Series([0.0] * 100, name="col")
+        fig, ax = plt.subplots()
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            # Should not raise any warning
+            analyzer.plot_histogram(series, ax)
+        plt.close(fig)

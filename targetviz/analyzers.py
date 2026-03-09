@@ -357,7 +357,9 @@ class BaseAnalyzer:
         else:
             ax.hist(series.to_numpy(), bins=30, density=True)
             plot_kde(series, ax, self.config)
-            ax.set(xlim=(series.min(), series.max()))
+            smin, smax = series.min(), series.max()
+            if smin < smax:
+                ax.set(xlim=(smin, smax))
             ax.axvline(x=series.mean(), color="orange", linestyle="--")
         ax.set_title(f"Distribution of {self.col}", fontsize=20)
         truncate_labels(ax, self.config)
@@ -600,7 +602,9 @@ class ColumnAnalyzer(BaseAnalyzer):
                     sns.scatterplot(x=df_sample[self.col], y=df_sample[self.target], ax=ax0)
                 else:
                     sns.scatterplot(x=df_small[self.col], y=df_small[self.target], ax=ax0)
-                ax0.set(xlim=(df_small[self.col].min(), df_small[self.col].max()))
+                smin, smax = df_small[self.col].min(), df_small[self.col].max()
+                if smin < smax:
+                    ax0.set(xlim=(smin, smax))
                 truncate_labels(ax0, self.config)
             elif target_type in ["BINARY", "CAT"]:
                 with warnings.catch_warnings():
@@ -645,7 +649,7 @@ class ColumnAnalyzer(BaseAnalyzer):
             rows_before = df_small.shape[0]
             assert df_small[self.col].isna().sum() == 0
             pct_rows_removed = (rows_before - df_small.shape[0]) / rows_before * 100
-            self.log.info(f"removed {pct_rows_removed:.0f}% nan")
+            self.log.info(f"removed {pct_rows_removed:.2f}% nan")
 
             if df_small[self.col].nunique() <= 2:
                 # variable only takes two values
