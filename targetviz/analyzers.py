@@ -68,6 +68,46 @@ def _clean_interval_categories(cut_series: pd.Series) -> pd.Series:
     return cut_series.cat.rename_categories(new_intervals)
 
 
+def _date_interval_categories(cut_series: pd.Series) -> pd.Series:
+    """Convert int64-nanosecond interval edges to readable date-range labels.
+
+    After ``pd.qcut`` on ``datetime64`` values cast to ``int64``, the interval
+    edges are nanosecond timestamps.  This replaces them with human-readable
+    date strings like ``(2021-12-26, 2022-06-24]``.
+    """
+    cats = cut_series.cat.categories
+    if not isinstance(cats, pd.IntervalIndex):
+        return cut_series
+
+    def _fmt(ns_val):
+        ts = pd.Timestamp(int(ns_val))
+        return ts.strftime("%Y-%m-%d")
+
+    new_labels = [f"({_fmt(iv.left)}, {_fmt(iv.right)}]" for iv in cats]
+    return cut_series.cat.rename_categories(dict(zip(cats, new_labels)))
+
+
+class _DateFormatter:
+    """Formatter for datetime values – drops sub-second precision.
+
+    Used as a drop-in replacement for the ``"{:.2f}"`` format string so that
+    ``formatter.format(value)`` works identically for both numeric and date
+    columns.
+    """
+
+    def format(self, value):
+        # Plain numbers (e.g. std-deviation in days) stay as-is.
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            return str(value)
+        try:
+            ts = pd.Timestamp(value)
+            if ts.hour == 0 and ts.minute == 0 and ts.second == 0:
+                return ts.strftime("%Y-%m-%d 00:00:00")
+            return ts.strftime("%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError, OverflowError):
+            return str(value)
+
+
 def _is_string_or_object_dtype(dtype) -> bool:
     """Check if dtype represents string or object data.
 
@@ -323,7 +363,7 @@ class BaseAnalyzer:
             "full_samp": full_samp,
             "is_cat": is_cat,
             "is_date": is_date,
-            "formatter": "{}" if is_date else "{:.2f}",
+            "formatter": _DateFormatter() if is_date else "{:.2f}",
         }
 
         # Replace infinite values with NaN so stats functions produce meaningful
@@ -664,7 +704,7 @@ class ColumnAnalyzer(BaseAnalyzer):
                     )
                     if len(cut_col.cat.categories) != cut_col.nunique():
                         cut_col = cut_col.cat.remove_unused_categories()
-                    cut_col = _clean_interval_categories(cut_col)
+                    cut_col = _date_interval_categories(cut_col)
 
                 else:
                     cut_col = pd.qcut(

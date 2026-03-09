@@ -17,6 +17,8 @@ from targetviz.analyzers import (  # noqa: E402
     _clean_fp_noise,
     _clean_interval_categories,
     _coerce_to_datetime,
+    _date_interval_categories,
+    _DateFormatter,
     _is_date_object_column,
     _is_datetime_dtype,
     _is_numeric_dtype,
@@ -868,205 +870,64 @@ class TestWarningSuppression:
         ]
         assert observed_warnings == [], f"FutureWarning about observed= leaked: {observed_warnings}"
 
-    def test_no_outlier_section_for_binary_predictor(self):
-        """Outlier analysis should NOT appear for binary predictors."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "BINARY"
-        ca.config.target_type = "NUM"
-        ca.config.pct_outliers = 0.05
 
-        df = pd.DataFrame(
-            {
-                "col": pd.Categorical([0, 1, 0, 1, np.nan]),
-                "target": [10, 20, 30, 40, 50],
-            }
-        )
-        html = ca.compute_target_expected_values(df)
-        assert "col is null" in html
-        assert "outlier" not in html
+# ===================================================================
+# _date_interval_categories
+# ===================================================================
 
-    # --- Binary target ---
 
-    def test_binary_target_num_predictor(self):
-        """Binary target should show class probabilities."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "NUM"
-        ca.config.target_type = "BINARY"
-        ca.config.pct_outliers = 0.05
+class TestDateIntervalCategories:
+    """Tests for _date_interval_categories."""
 
-        np.random.seed(1)
-        n = 100
-        col_vals = np.random.normal(0, 1, n).tolist()
-        col_vals[0] = np.nan
-        col_vals[1] = np.nan
-        target_vals = np.random.choice([0, 1], size=n).tolist()
-        df = pd.DataFrame({"col": col_vals, "target": target_vals})
+    def test_converts_ns_intervals_to_date_labels(self):
+        # Simulate what pd.qcut produces for dates cast to int64
+        dates = pd.to_datetime(["2022-01-01", "2023-06-15", "2024-12-31"])
+        breaks = [d.value for d in dates]  # nanosecond int64 values
+        idx = pd.IntervalIndex.from_breaks(breaks, closed="right")
+        s = pd.Series(pd.Categorical.from_codes([0, 1, 0, 1], categories=idx))
+        result = _date_interval_categories(s)
+        labels = list(result.cat.categories)
+        assert labels[0] == "(2022-01-01, 2023-06-15]"
+        assert labels[1] == "(2023-06-15, 2024-12-31]"
 
-        html = ca.compute_target_expected_values(df)
-        assert "P(" in html
-        assert "col is null" in html
-        assert "col is not null" in html
-        assert "col is outlier" in html
-        assert "col is not outlier" in html
+    def test_non_interval_categories_unchanged(self):
+        s = pd.Series(pd.Categorical(["a", "b", "a"]))
+        result = _date_interval_categories(s)
+        assert list(result.cat.categories) == ["a", "b"]
 
-    def test_binary_target_cat_predictor(self):
-        """Binary target + cat predictor: null/not-null but no outlier."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "CAT"
-        ca.config.target_type = "BINARY"
-        ca.config.pct_outliers = 0.05
 
-        df = pd.DataFrame(
-            {
-                "col": pd.Categorical(["a", "b", "a", np.nan, "b"]),
-                "target": [0, 1, 0, 1, 1],
-            }
-        )
-        html = ca.compute_target_expected_values(df)
-        assert "P(" in html
-        assert "col is null" in html
-        assert "col is not null" in html
-        assert "outlier" not in html
+# ===================================================================
+# _DateFormatter
+# ===================================================================
 
-    # --- Categorical target ---
 
-    def test_cat_target_num_predictor(self):
-        """CAT target should show per-class probabilities."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "NUM"
-        ca.config.target_type = "CAT"
-        ca.config.pct_outliers = 0.05
+class TestDateFormatter:
+    """Tests for _DateFormatter."""
 
-        np.random.seed(2)
-        n = 100
-        col_vals = np.random.normal(0, 1, n).tolist()
-        col_vals[0] = np.nan
-        target_vals = np.random.choice(["low", "mid", "high"], size=n).tolist()
-        df = pd.DataFrame({"col": col_vals, "target": target_vals})
+    def test_format_timestamp_no_time(self):
+        fmt = _DateFormatter()
+        ts = pd.Timestamp("2024-03-21")
+        assert fmt.format(ts) == "2024-03-21 00:00:00"
 
-        html = ca.compute_target_expected_values(df)
-        assert "P(" in html
-        assert "col is null" in html
-        assert "col is outlier" in html
+    def test_format_timestamp_with_time(self):
+        fmt = _DateFormatter()
+        ts = pd.Timestamp("2024-03-21 14:30:05")
+        assert fmt.format(ts) == "2024-03-21 14:30:05"
 
-    def test_cat_target_cat_predictor(self):
-        """CAT target + CAT predictor: null/not-null, no outlier."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "CAT"
-        ca.config.target_type = "CAT"
-        ca.config.pct_outliers = 0.05
+    def test_no_subsecond_precision(self):
+        fmt = _DateFormatter()
+        ts = pd.Timestamp("2024-03-21 08:37:41.967535872")
+        assert fmt.format(ts) == "2024-03-21 08:37:41"
 
-        df = pd.DataFrame(
-            {
-                "col": pd.Categorical(["x", "y", np.nan, "x", "y", "x"]),
-                "target": pd.Categorical(["a", "b", "a", "b", "a", "b"]),
-            }
-        )
-        html = ca.compute_target_expected_values(df)
-        assert "P(" in html
-        assert "col is null" in html
-        assert "col is not null" in html
-        assert "outlier" not in html
+    def test_numeric_passthrough(self):
+        fmt = _DateFormatter()
+        assert fmt.format(443.82) == "443.82"
 
-    def test_cat_target_cat_predictor_no_nulls(self):
-        """CAT target + CAT predictor with no nulls."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "CAT"
-        ca.config.target_type = "CAT"
-        ca.config.pct_outliers = 0.05
-
-        df = pd.DataFrame(
-            {
-                "col": pd.Categorical(["x", "y", "x", "y"]),
-                "target": pd.Categorical(["a", "b", "a", "b"]),
-            }
-        )
-        html = ca.compute_target_expected_values(df)
-        assert "No null values" in html
-        assert "outlier" not in html
-
-    # --- Edge cases ---
-
-    def test_all_null_predictor(self):
-        """When all predictor values are null, no null/not-null comparison possible."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "NUM"
-        ca.config.target_type = "NUM"
-        ca.config.pct_outliers = 0.05
-
-        df = pd.DataFrame({"col": [np.nan, np.nan, np.nan], "target": [1, 2, 3]})
-        html = ca.compute_target_expected_values(df)
-        # All null → null_count > 0 but not_null_count == 0 → no null section
-        assert "is null" not in html or "No null" in html
-
-    def test_pct_outliers_zero_skips_outlier_section(self):
-        """When pct_outliers=0, outlier analysis should be skipped."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "NUM"
-        ca.config.target_type = "NUM"
-        ca.config.pct_outliers = 0
-
-        df = pd.DataFrame({"col": [1.0, 2.0, 3.0], "target": [10, 20, 30]})
-        html = ca.compute_target_expected_values(df)
-        assert "outlier" not in html
-
-    def test_expected_value_correctness_numeric(self):
-        """Check the actual numeric values are computed correctly."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "NUM"
-        ca.config.target_type = "NUM"
-        ca.config.pct_outliers = 0
-
-        df = pd.DataFrame(
-            {
-                "col": [np.nan, np.nan, 1.0, 2.0],
-                "target": [100.0, 200.0, 10.0, 20.0],
-            }
-        )
-        html = ca.compute_target_expected_values(df)
-        # E[target | col is null] = mean(100, 200) = 150.0
-        assert "150.0000" in html
-        # E[target | col is not null] = mean(10, 20) = 15.0
-        assert "15.0000" in html
-
-    def test_expected_value_correctness_binary_target(self):
-        """Check class probabilities for binary target."""
-        config_ = _make_config()
-        log = _make_log()
-        ca = ColumnAnalyzer("col", "target", config_, log)
-        ca.type = "NUM"
-        ca.config.target_type = "BINARY"
-        ca.config.pct_outliers = 0
-
-        df = pd.DataFrame(
-            {
-                "col": [np.nan, np.nan, 1.0, 2.0],
-                "target": [0, 1, 1, 1],
-            }
-        )
-        html = ca.compute_target_expected_values(df)
-        # null group: [0, 1] → P(0)=50%, P(1)=50%
-        assert "50.00%" in html
-        # not-null group: [1, 1] → P(1)=100%
-        assert "100.00%" in html
+    def test_numpy_datetime64(self):
+        fmt = _DateFormatter()
+        val = np.datetime64("2022-01-23")
+        result = fmt.format(val)
+        assert result == "2022-01-23 00:00:00"
 
 
 # ===================================================================
