@@ -350,7 +350,7 @@ class TestTargetAnalyzerCheckTypes:
         ta = TargetAnalyzer("target", config_, log)
         ta.type = "UNIQUE"
         df = pd.DataFrame({"target": [1, 1, 1]})
-        with pytest.raises(TypeError, match="not an allowed type"):
+        with pytest.raises(ValueError, match="only one unique value"):
             ta.check_types(df)
 
     def test_date_target_raises(self):
@@ -371,6 +371,33 @@ class TestTargetAnalyzerCheckTypes:
         df = pd.DataFrame({"target": ["a", "b", "c", "d", "e"]})
         with pytest.raises(AssertionError, match="too large"):
             ta.check_types(df)
+
+
+class TestTargetAnalyzerRunNullCheck:
+    def test_target_with_nulls_raises(self):
+        config_ = _make_config()
+        log = _make_log()
+        ta = TargetAnalyzer("target", config_, log)
+        df = pd.DataFrame({"target": [1, 2, None, 4]})
+        with pytest.raises(ValueError, match="contains 1 null value"):
+            ta.run(df)
+
+    def test_target_with_multiple_nulls_raises(self):
+        config_ = _make_config()
+        log = _make_log()
+        ta = TargetAnalyzer("target", config_, log)
+        df = pd.DataFrame({"target": [1, None, None, 4]})
+        with pytest.raises(ValueError, match="contains 2 null value"):
+            ta.run(df)
+
+    def test_target_with_no_nulls_passes(self):
+        config_ = _make_config()
+        log = _make_log()
+        ta = TargetAnalyzer("target", config_, log)
+        df = pd.DataFrame({"target": [1, 2, 3, 4]})
+        # Should not raise
+        data, hist, table = ta.run(df)
+        assert len(data) == 4
 
 
 # ===================================================================

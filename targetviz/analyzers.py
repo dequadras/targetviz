@@ -377,6 +377,11 @@ class TargetAnalyzer(BaseAnalyzer):
         """
         Function checks that the target type is acceptable
         """
+        if self.type == "UNIQUE":
+            raise ValueError(
+                f"Target variable '{self.target}' has only one unique value and cannot be "
+                f"analyzed. A target must have at least two distinct values."
+            )
         if self.type not in ["BINARY", "CAT", "NUM"]:
             raise TypeError(f"{self.type} is not an allowed type for the target")
         if self.type == "CAT":
@@ -389,6 +394,15 @@ class TargetAnalyzer(BaseAnalyzer):
         method for running the main function from TargetAnalyzer
         """
         data = data.copy()  # avoid SettingWithCopyWarning when modifying target column
+
+        # Check for null values in target before any processing
+        null_count = data[self.target].isna().sum()
+        if null_count > 0:
+            raise ValueError(
+                f"Target variable '{self.target}' contains {null_count} null value(s). "
+                f"Please filter out or impute the missing values before generating the report."
+            )
+
         dfs = get_df_small(data, self.target, self.target)
         dfs = self.get_type(dfs)
         data[self.target] = dfs[self.target]
