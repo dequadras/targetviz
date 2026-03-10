@@ -10,4 +10,3 @@
 | Bank Marketing | Binary – subscription | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/bank_marketing.html) |
 | Census | Binary – income | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/census.html) |
 | Chicago Employees | Regression – salary | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/chicago_employees.html) |
-| Cars | Regression – price | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/cars.html) |

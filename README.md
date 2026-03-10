@@ -44,7 +44,9 @@ From the histogram we can see that the values go from 0 to 5, the spike at 5 sug
 
 Next to the histogram we have the table with some statistics that can help us understand the variable.
 
-![Target analysis](./img/cal_housing_target_analysis.png)
+Here is the image of what we have mentioned so far:
+
+![Target analysis](img/cal_housing_target_analysis.png)
 
 
 Now let's look at the first predictor, which is column MedInc (median income). Note that columns are sorted based on how much of the target they can explain, so the first variable is likely the most powerful.
@@ -52,7 +54,7 @@ Now let's look at the first predictor, which is column MedInc (median income). N
 We have the same univariate plot and table as for the target.
 
 We also have 3 more plots that help us explain the relation of this variable to the target variable.
-On the left we have a scatterplot so that we can get a first view. But it is sometimes difficult to get a good view of the correlation with the scatter plot, so we also have a another plot on the top right. Here we split the predictor variable MedInc into quantiles. We then plot the average of the predicted variable (house price) for each of those quantiles. It is here that we see, that on average, places with higher income tend to have way more expensive houses.
+On the left we have a scatterplot so that we can get a first view. But it is sometimes difficult to get a good view of the correlation with the scatter plot, so we also have a another plot on the right. Here we split the predictor variable MedInc into quantiles. We then plot the average of the predicted variable (house price) for each of those quantiles. It is here that we see, that on average, places with higher income tend to have way more expensive houses.
 ![MedInc analysis](img/cal_housing_medinc_analysis.png)
 
 We can dig deeper and we will see different relationships. When we arrive at house age, we see something interesting: older houses tend to be more expensive. That doesn't make economical sense, under the same conditions, a new house is typically more desirable, since they have better conditions and tend to have fewer issues.
@@ -61,7 +63,7 @@ The reason I'm bringing this up is that we need to be careful when jumping to co
 
 Some other important things to know:
 
-In the file config.yaml there are some default configuration values. Those can be overridden when calling the function `targetviz_report`. For example, the default for outlier removal is 0% but in our function we set it to 5% using pct_outliers=0.05
+In the file [config.yaml](targetviz/config_default.yaml) there are some default configuration values. Those can be overridden when calling the function `targetviz_report`. For example, the default for outlier removal is 0% but in our function we set it to 5% using pct_outliers=0.05
 
 For calculating the explained variance, we first divide the explanatory variable into quantiles, we then calculate the sum of squares between groups:
 
@@ -102,7 +104,7 @@ Below are rendered reports for various datasets:
 | Bank Marketing | Binary – subscription | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/bank_marketing.html) |
 | Census | Binary – income | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/census.html) |
 | Chicago Employees | Regression – salary | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/chicago_employees.html) |
-| Cars | Regression – price | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/cars.html) |
+
 
 
 ## Kaggle Notebooks
