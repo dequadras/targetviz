@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "targetviz"
-version = "0.0.1"
+version = "0.1.0"
 description = "Package for generating automatic reports of variable analyses related to a target variable"
 readme = "README.md"
 license = { file = "LICENSE" }
