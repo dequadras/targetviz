@@ -27,10 +27,14 @@ jobs:
             extra-deps: 'pyarrow'
           - python-version: '3.13'
             extra-deps: 'pyarrow'
+          - python-version: '3.14'
+            extra-deps: 'pyarrow'
           # pandas 3 compatibility
           - python-version: '3.12'
             extra-deps: 'pyarrow pandas>=3.0'
           - python-version: '3.13'
+            extra-deps: 'pyarrow pandas>=3.0'
+          - python-version: '3.14'
             extra-deps: 'pyarrow pandas>=3.0'
 
     steps:

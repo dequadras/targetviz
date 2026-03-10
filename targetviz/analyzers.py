@@ -74,16 +74,27 @@ def _date_interval_categories(cut_series: pd.Series) -> pd.Series:
     After ``pd.qcut`` on ``datetime64`` values cast to ``int64``, the interval
     edges are nanosecond timestamps.  This replaces them with human-readable
     date strings like ``(2021-12-26, 2022-06-24]``.
+
+    If the day-level format produces duplicate labels (bins within the same
+    day), progressively more precise formats are tried.
     """
     cats = cut_series.cat.categories
     if not isinstance(cats, pd.IntervalIndex):
         return cut_series
 
-    def _fmt(ns_val):
-        ts = pd.Timestamp(int(ns_val))
-        return ts.strftime("%Y-%m-%d")
+    formats = ["%Y-%m-%d", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"]
+    for fmt in formats:
 
-    new_labels = [f"({_fmt(iv.left)}, {_fmt(iv.right)}]" for iv in cats]
+        def _fmt(ns_val, _f=fmt):
+            ts = pd.Timestamp(int(ns_val))
+            return ts.strftime(_f)
+
+        new_labels = [f"({_fmt(iv.left)}, {_fmt(iv.right)}]" for iv in cats]
+        if len(set(new_labels)) == len(new_labels):
+            return cut_series.cat.rename_categories(dict(zip(cats, new_labels)))
+
+    # Last resort: append a running index to guarantee uniqueness
+    new_labels = [f"({_fmt(iv.left)}, {_fmt(iv.right)}] #{i}" for i, iv in enumerate(cats)]
     return cut_series.cat.rename_categories(dict(zip(cats, new_labels)))
 
 
