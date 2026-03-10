@@ -17,7 +17,7 @@ from sklearn import datasets
 
 import targetviz
 
-# Load an example dataset fom sklearn repository
+# Load an example dataset from sklearn repository
 sklearn_dataset = datasets.fetch_california_housing()
 df = pd.DataFrame(sklearn_dataset.data, columns=sklearn_dataset.feature_names)
 df['price'] = pd.Series(sklearn_dataset.target)
@@ -29,7 +29,7 @@ targetviz.targetviz_report(df, target='price', output_dir='./', name_file_out="c
 The function targetviz.targetviz_report outputs an html file in the working directory.
 
 
-# Mini Tutorial
+## Mini Tutorial
 Let's give an example of how to use that with a real live dataset, for that let's use the california housing dataset from sklearn.
 This dataset contains information on house prices in California from the 1990s along with other features.
 
@@ -40,11 +40,11 @@ Notice we have added outlier removal. If we set it to 5%, it will remove the top
 So we have the report generated [here](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/cal_housing.html). Let's take a look.
 
 First we have a quick univariate analysis of the target value (median price of houses in units of 100k USD), in this case it is a regression, but it also accepts binary or categorical variables.
-From the histogram we can see that the values go from 0 to 5, the spike at 5 suggest results might have been clipped. We can see the mode at ~1.5 and the mean close to 2. We probably would have expected a long tail on the right if results had not been clipped
+From the histogram we can see that the values go from 0 to 5, the spike at 5 suggests results might have been clipped. We can see the mode at ~1.5 and the mean close to 2. We probably would have expected a long tail on the right if results had not been clipped.
 
 Next to the histogram we have the table with some statistics that can help us understand the variable.
 
-![alt text](./img/cal_housing_target_analysis.png)
+![Target analysis](./img/cal_housing_target_analysis.png)
 
 
 Now let's look at the first predictor, which is column MedInc (median income). Note that columns are sorted based on how much of the target they can explain, so the first variable is likely the most powerful.
@@ -53,15 +53,15 @@ We have the same univariate plot and table as for the target.
 
 We also have 3 more plots that help us explain the relation of this variable to the target variable.
 On the left we have a scatterplot so that we can get a first view. But it is sometimes difficult to get a good view of the correlation with the scatter plot, so we also have a another plot on the top right. Here we split the predictor variable MedInc into quantiles. We then plot the average of the predicted variable (house price) for each of those quantiles. It is here that we see, that on average, places with higher income tend to have way more expensive houses.
-![alt text](img/cal_housing_medinc_analysis.png)
+![MedInc analysis](img/cal_housing_medinc_analysis.png)
 
-We can dig deeper and we wil see different relationships. When we arrive to house age, we see something interesting: older houses tend to be more expensive. That doesn't make economical sense, under the same conditions, a new house is typically more desirable, since they have better conditions and tend to have less issues.
+We can dig deeper and we will see different relationships. When we arrive at house age, we see something interesting: older houses tend to be more expensive. That doesn't make economical sense, under the same conditions, a new house is typically more desirable, since they have better conditions and tend to have fewer issues.
 The problem here is "under the same conditions", which is clearly not true in the real world. Probably older houses tend to be in city centers where the square footage is quite expensive and thus the counterintuitive results.
-The reason I'm bringing this up is that we need to be careful when jumping to conclusions, and we need to think critically about the results we see
+The reason I'm bringing this up is that we need to be careful when jumping to conclusions, and we need to think critically about the results we see.
 
 Some other important things to know:
 
-In the file config.yaml there are some default configuration values. Those can be overriden when calling the function `targetviz_report`. For example, the default for outlier removal is 0% but in our function we set it to 5% using pct_outliers=0.05
+In the file config.yaml there are some default configuration values. Those can be overridden when calling the function `targetviz_report`. For example, the default for outlier removal is 0% but in our function we set it to 5% using pct_outliers=0.05
 
 For calculating the explained variance, we first divide the explanatory variable into quantiles, we then calculate the sum of squares between groups:
 
@@ -81,8 +81,6 @@ import targetviz
 
 # Load the Titanic dataset from a CSV file directly from the web
 url = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
-# Load an example dataset fom sklearn repository
-
 titanic = pd.read_csv(url)
 
 # Generate HTML report in the current directory
@@ -105,3 +103,23 @@ Below are rendered reports for various datasets:
 | Census | Binary – income | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/census.html) |
 | Chicago Employees | Regression – salary | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/chicago_employees.html) |
 | Cars | Regression – price | [View Report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/dequadras/targetviz/main/samples/cars.html) |
+
+
+## Kaggle Notebooks
+
+Try TargetViz directly on Kaggle:
+
+| Notebook | Link |
+|----------|------|
+| Titanic | [Super Fast EDA](https://www.kaggle.com/code/dequadras/super-fast-eda) |
+| House Prices | [Speedy EDA – TargetViz](https://www.kaggle.com/code/dequadras/speedy-eda-targetviz) |
+| Used Car Prices | [Super Fast EDA with TargetViz](https://www.kaggle.com/code/dequadras/super-fast-eda-with-targetviz) |
+| UM Game Playing Strength | [Super Fast EDA – TargetViz](https://www.kaggle.com/code/dequadras/super-fast-eda-targetviz) |
+
+
+## Why Quantiles?
+
+Many of the plots in TargetViz bin features into quantiles rather than using raw values. There are two reasons for this:
+
+1. **Better visualizations.** Real-world distributions often have long tails or extreme outliers. Plotting raw values compresses most of the data into a small region of the chart. Quantiles spread the data evenly, making patterns visible at a glance.
+2. **How tree models think.** Decision trees (and gradient-boosted trees like XGBoost/LightGBM) split on rank order, not magnitude. A tree doesn't care that income jumps from 50k to 500k — it only cares which side of the split a value falls on. Quantile-binned plots mirror this behavior, so what you see in the report is closer to what the model will learn.
