@@ -1,42 +1,22 @@
 <h2>----------------</h2>
-<h2>Column: {{ column }}</h2>
+<h2 id="var-{{ column | replace(' ', '-') | replace('.', '-') }}">Column: {{ column }}</h2>
 <p>Explained Variance: {{ "{:.2f}%".format(result_dict[column]['explained_var'] * 100) }}</p>
 
 <div class="flex-container">
     <div class="histogram">
-        {% block column_histogram %}
-        <img class="img-responsive center-img" src="{{ result_dict[column]['histogram'] }}" alt="Column Histogram" style="width:100%;">
-        {% endblock column_histogram %}
+        {{ result_dict[column]['histogram'] | safe }}
     </div>
     <div class="table-container">
-        {% block column_table %}
         {{ result_dict[column]['table'] | safe }}
-        {% endblock column_table %}
     </div>
 </div>
 
-<div>
-    {% block rel_fig %}
-    <img src="{{ result_dict[column]['rel_fig'] }}" alt="Relationship with Target Variable" style="width:100%;"/>
-    {% endblock rel_fig %}
+<div class="rel-fig-container">
+    {{ result_dict[column]['rel_fig'] | safe }}
 </div>
 
-<style>
-    .table-container {
-        width: 48%;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.9em; /* Slightly reduce font size */
-    }
-    th, td {
-        border: 1px solid #ddd;
-        padding: 4px; /* Reduce padding */
-        text-align: left;
-        line-height: 1.2; /* Reduce line height */
-    }
-    th {
-        background-color: #f2f2f2;
-    }
-</style>
+{% if result_dict[column]['target_stats'] %}
+<div class="target-stats" style="margin-top: 10px; margin-bottom: 20px; padding: 10px; background-color: #f9f9f9; border-left: 3px solid #4CAF50; font-size: 0.95em;">
+    <p style="margin: 0;">{{ result_dict[column]['target_stats'] | safe }}</p>
+</div>
+{% endif %}

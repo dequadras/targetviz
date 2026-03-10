@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TargetViz Report</title>
+    <title>TargetViz Report{% if report_name %} – {{ report_name }}{% endif %}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,35 +14,47 @@
         h1, h2 {
             color: #333;
         }
-        .img-responsive {
-            max-width: 100%;
-            height: auto;
-        }
-        .center-img {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
         .flex-container {
             display: flex;
             justify-content: space-between;
+            gap: 2%;
+            align-items: flex-start;
+            margin-bottom: 20px;
         }
         .histogram {
             width: 48%;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .histogram svg {
+            width: 100%;
+            height: auto;
+            display: block;
         }
         .table-container {
             width: 48%;
+            min-width: 0;
+            overflow: auto;
+        }
+        .rel-fig-container {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .rel-fig-container svg {
+            width: 100%;
+            height: auto;
+            display: block;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9em; /* Slightly reduce font size */
+            font-size: 0.9em;
         }
         th, td {
             border: 1px solid #ddd;
-            padding: 4px; /* Reduce padding */
+            padding: 4px;
             text-align: left;
-            line-height: 1.2; /* Reduce line height */
+            line-height: 1.2;
         }
         th {
             background-color: #f2f2f2;
@@ -52,22 +64,65 @@
 <body>
     <h1>Analysis of the Relationship of Variables to a Target Variable</h1>
 
+    {% if toc_entries %}
+    <div id="toc-panel" style="margin-bottom: 24px; padding: 14px 18px; background-color: #f7f9fc; border: 1px solid #c8d6e5; border-radius: 6px;">
+        <div style="cursor: pointer; font-weight: bold; font-size: 1.1em; color: #2c3e50; user-select: none;" onclick="var t=this.nextElementSibling;t.style.display=t.style.display==='none'?'':'none';">
+            📋 Table of Contents ({{ toc_entries|length }} variables)
+        </div>
+        <table style="margin-top: 12px; width: auto; border-collapse: collapse; font-size: 0.92em;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid #ddd; padding: 6px 10px; background-color: #eaf0f6; text-align: left; width: 40px;">#</th>
+                    <th style="border: 1px solid #ddd; padding: 6px 10px; background-color: #eaf0f6; text-align: left;">Variable</th>
+                    <th style="border: 1px solid #ddd; padding: 6px 10px; background-color: #eaf0f6; text-align: right; width: 140px;">Explained Variance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in toc_entries %}
+                <tr style="background-color: {{ '#ffffff' if loop.index is odd else '#f7f9fc' }};">
+                    <td style="border: 1px solid #ddd; padding: 5px 10px; color: #888;">{{ loop.index }}</td>
+                    <td style="border: 1px solid #ddd; padding: 5px 10px;">
+                        <a href="#var-{{ entry.name | replace(' ', '-') | replace('.', '-') }}" style="color: #2980b9; text-decoration: none;" onclick="event.preventDefault();var el=document.getElementById('var-{{ entry.name | replace(' ', '-') | replace('.', '-') }}');if(el)el.scrollIntoView({behavior:'smooth'});">{{ entry.name }}</a>
+                    </td>
+                    <td style="border: 1px solid #ddd; padding: 5px 10px; text-align: right; font-family: monospace;">{{ "{:.2f}%".format(entry.explained_var * 100) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if skipped_variables %}
+    <details style="margin-bottom: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;">
+        <summary style="cursor: pointer; font-weight: bold; color: #856404;">
+            ⚠ {{ skipped_variables|length }} variable{{ 's' if skipped_variables|length > 1 else '' }} skipped
+        </summary>
+        <table style="margin-top: 10px; width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid #ddd; padding: 6px; background-color: #f2f2f2; text-align: left;">Variable</th>
+                    <th style="border: 1px solid #ddd; padding: 6px; background-color: #f2f2f2; text-align: left;">Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for var in skipped_variables %}
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 6px;">{{ var.name }}</td>
+                    <td style="border: 1px solid #ddd; padding: 6px;">{{ var.reason }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+    {% endif %}
+
     <div>
-        {% block content %}
-        <h2>TARGET</h2>
+        <h2>TARGET: {{ result_dict.target }}</h2>
         <div class="flex-container">
             <div class="histogram">
-                {% block target_histogram %}
-                <img class="img-responsive center-img" src="{{ result_dict.target_histogram }}" alt="Target Variable Histogram" style="width:100%;">
-                {% endblock target_histogram %}
+                {{ result_dict.target_histogram | safe }}
             </div>
             <div class="table-container">
-                {% block target_table %}
                 {{ result_dict.target_table | safe }}
-                {% endblock target_table %}
             </div>
         </div>
-        {% endblock %}
-    </div>
-</body>
-</html>

@@ -1,70 +1,71 @@
-"""Configuration for the package is handled in this wrapper for confuse.
-https://github.com/pandas-profiling/pandas-profiling/blob/a55ab613865cbd0a11f2056ca6f6ca1c43c0a2f1/pandas_profiling/config.py
+"""Configuration for the targetviz package.
+
+Defaults are loaded from config_default.yaml. Users can override any value
+via keyword arguments passed to ``targetviz_report()``.
 """
 
-import argparse
 from pathlib import Path
+from typing import Any, Dict
 
-import confuse
+import yaml
+
+_NESTED_KEYS = {"hist", "kde", "heatmap"}
 
 
-def get_config_default() -> Path():
-    """Returns the path to the default config_ file.
-    Returns:
-        The path to the default config_ file.
-    """
+def _get_config_default() -> Path:
+    """Return the path to the bundled default config file."""
     return Path(__file__).parent / "config_default.yaml"
 
 
-class Config(object):
-    """This is a wrapper for the python confuse package, which handles setting and
-    getting configuration variables via various ways (notably via argparse and kwargs).
+class _SubConfig:
+    """Lightweight namespace for nested config sections (hist, kde, heatmap)."""
+
+    def __init__(self, data: dict) -> None:
+        for key, value in data.items():
+            setattr(self, key, value)
+
+    def __repr__(self) -> str:
+        attrs = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items())
+        return f"_SubConfig({attrs})"
+
+
+class Settings:
+    """Configuration settings for targetviz.
+
+    All defaults are loaded from ``config_default.yaml``.
+    Override any setting via kwargs passed to ``targetviz_report()``.
     """
 
-    config = None
-    """The confuse.Configuration object."""
+    def __init__(self) -> None:
+        with open(_get_config_default(), "r", encoding="utf-8") as fh:
+            defaults: Dict[str, Any] = yaml.safe_load(fh)
 
-    def __init__(self):
-        """The config_ constructor should be called only once."""
-        if self.config is None:
-            self.config = confuse.Configuration("PandasProfiling", __name__)
-            self.config.set_file(str(get_config_default()))
-
-    def set_args(self, namespace: argparse.Namespace, dots: bool) -> None:
-        """
-        Set config_ variables based on the argparse Namespace object.
-        Args:
-            namespace: Dictionary or Namespace to overlay this config_ with. Supports
-                nested Dictionaries and Namespaces.
-            dots: If True, any properties on namespace that contain dots (.) will be
-                broken down into child dictionaries.
-        """
-        self.config.set_args(namespace, dots)
-
-    def _set_kwargs(self, reference, values: dict):
-        """Helper function to set config_ variables based on kwargs."""
-        for key, value in values.items():
-            if key in reference:
-                if isinstance(value, dict):
-                    self._set_kwargs(reference[key], value)
-                else:
-                    reference[key].set(value)
+        for key, value in defaults.items():
+            if key in _NESTED_KEYS and isinstance(value, dict):
+                setattr(self, key, _SubConfig(value))
             else:
-                raise ValueError('Config parameter "{}" does not exist.'.format(key))
+                setattr(self, key, value)
 
-    def set_kwargs(self, kwargs) -> None:
+        # Runtime values (set dynamically during report generation)
+        self.timestamp: str = ""
+        self.target_type: str = ""
+
+    def set_kwargs(self, kwargs: dict) -> None:
+        """Apply user-supplied keyword arguments to the config.
+
+        Supports nested dicts for sub-configs (e.g. ``hist``, ``kde``, ``heatmap``).
         """
-        Helper function to set config_ variables based on kwargs.
-        Args:
-            kwargs: the arguments passed to the .profile_report() function
-        """
-        self._set_kwargs(self.config, kwargs)
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                raise ValueError(f'Config parameter "{key}" does not exist.')
+            if isinstance(value, dict):
+                sub = getattr(self, key)
+                for sub_key, sub_value in value.items():
+                    if not hasattr(sub, sub_key):
+                        raise ValueError(f'Config parameter "{key}.{sub_key}" does not exist.')
+                    setattr(sub, sub_key, sub_value)
+            else:
+                setattr(self, key, value)
 
-    def __getitem__(self, item):
-        return self.config[item]
 
-    def __setitem__(self, key, value):
-        self.config[key].set(value)
-
-
-config = Config()
+config = Settings()

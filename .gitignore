@@ -11,6 +11,8 @@ __pycache__/
 next_steps.md
 build/
 dist/
+.venv/
+*.prof
 
 # exceptions
 !samples/*html
