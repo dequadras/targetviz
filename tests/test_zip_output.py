@@ -4,7 +4,7 @@ import zipfile
 
 import pandas as pd
 
-from targetviz.main import targetviz_report
+from targetviz.profile_report import targetviz_report
 
 
 def test_html_and_zip_output():
